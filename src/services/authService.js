@@ -25,24 +25,33 @@ exports.kakaoLogin = async (code) => {
   );
   const { access_token } = tokenRes.data;
 
-  // 2. access_token으로 사용자 정보 조회
-  const userRes = await axios.get('https://kapi.kakao.com/v2/user/me', {
-    headers: { Authorization: `Bearer ${access_token}` },
-  });
-  const kakaoUser = userRes.data;
+  // 2. access_token으로 사용자 정보 조회 (에러 핸들링 추가)
+  let kakaoUser;
+  try {
+    const userRes = await axios.get('https://kapi.kakao.com/v2/user/me', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    kakaoUser = userRes.data;
+  } catch (err) {
+    throw new Error('카카오 사용자 정보 조회 실패: ' + (err.response?.data?.msg || err.message));
+  }
 
   // 3. DB에서 사용자 조회/생성 (예시: kakao_id 기준)
-  let { data: user } = await supabase
+  // .maybeSingle() 사용: 없으면 null 반환, 있으면 객체 반환
+  let { data: user, error: userError } = await supabase
     .from('users')
     .select('*')
     .eq('kakao_id', kakaoUser.id)
-    .single();
+    .maybeSingle();
+  if (userError) throw userError;
 
   if (!user) {
     // 신규 회원가입
+    // 이메일이 없을 경우 fallback 처리
+    const email = kakaoUser.kakao_account?.email || `kakao_${kakaoUser.id}@noemail.com`;
     const { data: newUser, error } = await supabase
       .from('users')
-      .insert([{ kakao_id: kakaoUser.id, email: kakaoUser.kakao_account.email }])
+      .insert([{ kakao_id: kakaoUser.id, email }])
       .select()
       .single();
     if (error) throw error;
