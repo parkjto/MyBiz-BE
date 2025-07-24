@@ -1,0 +1,42 @@
+# 마이비 Node.js/Express 백엔드 규칙
+
+## 1. 프로젝트 구조
+- **폴더 표준**
+
+src/
+├── controllers/   # 비즈니스 로직
+├── routes/        # REST 라우터
+├── services/      # 외부 API·DB 로직
+├── middlewares/   # 인증·로깅·검증
+├── models/        # Mongoose 스키마
+├── utils/         # 헬퍼
+├── config/        # 환경설정
+└── tests/         # 테스트
+
+- **모듈화**  
+컨트롤러→서비스→모델 계층 분리, Express Router로 엔드포인트 모듈화.
+
+## 2. 코딩 스타일
+| 항목 | 규칙 |
+|------|------|
+| 문법 | ES2022+, `async/await` 우선 |
+| 선언 | `const/let` 사용, `var` 금지 |
+| 네이밍 | camelCase(함수·변수) / PascalCase(클래스) |
+| 인덴트 | 2 Space, 세미콜론 필수 |
+| 주석 | 한국어 허용·영문 병기 권장 |
+
+## 3. 보안
+- `helmet`, `cors`, `express-rate-limit` 반드시 적용
+- 모든 민감 변수는 `.env`, Git ignore 필수
+- 입력 검증: **Joi** 또는 **Zod** 미들웨어(예: 사업자번호 형식) 적용
+
+## 4. REST API 설계
+- 명사형 URL /api/v1/, 상태코드·JSON 응답 통일.
+- 에러 미들웨어 중앙화, 사용자 메시지는 한글·로그는 영문.
+
+## 5. 성능·운영
+- `compression`(gzip), 정적 캐싱, DB 쿼리 `async` 처리
+- PM2 실행, graceful shutdown, `/health` 엔드포인트 제공.
+- 테스트: Jest + Supertest, 코드 커버리지 ≥ 80 %.
+
+
