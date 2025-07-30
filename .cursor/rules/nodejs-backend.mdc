@@ -1,3 +1,6 @@
+---
+alwaysApply: true
+---
 # 마이비 Node.js/Express 백엔드 규칙
 
 ## 1. 프로젝트 구조
@@ -23,7 +26,7 @@ src/
 | 선언 | `const/let` 사용, `var` 금지 |
 | 네이밍 | camelCase(함수·변수) / PascalCase(클래스) |
 | 인덴트 | 2 Space, 세미콜론 필수 |
-| 주석 | 한국어 허용·영문 병기 권장 |
+| 주석 | 한국어 허용·영문 병기 권장 , 주석 처음 보는사람도 알아볼수있게|
 
 ## 3. 보안
 - `helmet`, `cors`, `express-rate-limit` 반드시 적용

@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:naver-api": "node src/tests/testNaverLocalApi.js",
+    "test:api": "node src/tests/testApiEndpoints.js"
   },
   "keywords": [],
   "author": "",
@@ -11,10 +15,16 @@
   "description": "",
   "dependencies": {
     "@supabase/supabase-js": "^2.52.0",
+    "axios": "^1.11.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^4.19.3",
+    "jsonwebtoken": "^9.0.2",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "joi": "^17.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
   }
 }
