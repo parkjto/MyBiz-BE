@@ -12,9 +12,12 @@ router.get('/sales', (req, res) => {
   res.json({ message: '매출 분석 기능 (예시)' });
 });
 
-// 예시: 고객 감정 분석 라우트
-router.get('/reviews', (req, res) => {
-  res.json({ message: '고객 감정 분석 기능 (예시)' });
-});
+// 리뷰 관련 라우트
+const reviewsRoutes = require('./routes/reviews');
+router.use('/reviews', reviewsRoutes);
+
+// 매장 검색 관련 라우트
+const storesRoutes = require('./routes/stores');
+router.use('/stores', storesRoutes);
 
 module.exports = router;

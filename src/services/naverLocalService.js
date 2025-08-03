@@ -30,9 +30,9 @@ class NaverLocalService {
     };
     
     if (!this.NAVER_CLIENT_ID || !this.NAVER_CLIENT_SECRET) {
-      console.warn('⚠️ 네이버 API 키가 설정되지 않았습니다. 일부 기능이 제한될 수 있습니다.');
+      console.warn('[WARNING] 네이버 API 키가 설정되지 않았습니다. 일부 기능이 제한될 수 있습니다.');
     } else {
-      console.log('✅ 네이버 API 키 설정 완료');
+      console.log('[INFO] 네이버 API 키 설정 완료');
     }
   }
 
@@ -69,10 +69,10 @@ class NaverLocalService {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
       });
       
-      console.log('✅ 브라우저 초기화 완료');
+      console.log('[INFO] 브라우저 초기화 완료');
       return true;
     } catch (error) {
-      console.error('❌ 브라우저 초기화 실패:', error);
+      console.error('[ERROR] 브라우저 초기화 실패:', error);
       return false;
     }
   }
@@ -86,10 +86,10 @@ class NaverLocalService {
         await this.browser.close();
         this.browser = null;
         this.page = null;
-        console.log('✅ 브라우저 종료 완료');
+        console.log('[INFO] 브라우저 종료 완료');
       }
     } catch (error) {
-      console.error('❌ 브라우저 종료 실패:', error);
+      console.error('[ERROR] 브라우저 종료 실패:', error);
     }
   }
 
@@ -109,7 +109,7 @@ class NaverLocalService {
         };
       }
 
-      console.log(`🔍 매장 검색: "${query}"`);
+      console.log(`[INFO] 매장 검색: "${query}"`);
 
       // 1차 검색: 원본 검색어로 검색
       const primaryResponse = await axios.get('https://openapi.naver.com/v1/search/local.json', {
@@ -125,18 +125,18 @@ class NaverLocalService {
         }
       });
 
-      console.log(`✅ 1차 검색 완료: ${primaryResponse.data.items?.length || 0}개 결과`);
+      console.log(`[SUCCESS] 1차 검색 완료: ${primaryResponse.data.items?.length || 0}개 결과`);
 
       // 2차 검색: 복합 검색어인 경우 개별 키워드로도 검색
       let secondaryResults = [];
       const keywords = query.split(' ').filter(k => k.length > 1);
       
       if (keywords.length > 1) {
-        console.log(`🔍 2차 검색: 복합 검색어 감지, 개별 키워드 검색 시도`);
+        console.log(`[INFO] 2차 검색: 복합 검색어 감지, 개별 키워드 검색 시도`);
         
         for (const keyword of keywords.slice(0, 2)) { // 최대 2개 키워드만 시도
           try {
-            console.log(`🔍 2차 검색어: "${keyword}"`);
+            console.log(`[INFO] 2차 검색어: "${keyword}"`);
             
             const secondaryResponse = await axios.get('https://openapi.naver.com/v1/search/local.json', {
               headers: {
@@ -159,12 +159,12 @@ class NaverLocalService {
             await this.delay(500);
             
           } catch (error) {
-            console.log(`⚠️ 2차 검색 실패 (${keyword}):`, error.message);
+            console.log(`[WARNING] 2차 검색 실패 (${keyword}):`, error.message);
             continue;
           }
         }
         
-        console.log(`✅ 2차 검색 완료: ${secondaryResults.length}개 결과`);
+        console.log(`[SUCCESS] 2차 검색 완료: ${secondaryResults.length}개 결과`);
       }
 
       // 결과 통합 및 중복 제거
@@ -174,7 +174,7 @@ class NaverLocalService {
       }
 
       const uniqueResults = this.removeDuplicateStores(allResults);
-      console.log(`✅ 통합 검색 완료: ${uniqueResults.length}개 결과 (중복 제거 후)`);
+      console.log(`[SUCCESS] 통합 검색 완료: ${uniqueResults.length}개 결과 (중복 제거 후)`);
 
       return {
         success: true,
@@ -184,7 +184,7 @@ class NaverLocalService {
       };
 
     } catch (error) {
-      console.error('❌ 매장 검색 실패:', error.message);
+      console.error('[ERROR] 매장 검색 실패:', error.message);
       return {
         success: false,
         error: error.message,

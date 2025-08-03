@@ -32,7 +32,7 @@ class StoresController {
     try {
       const { query, display = 5 } = req.query;
       
-      console.log('🔍 매장 검색 요청:', { query, display });
+      console.log('[INFO] 매장 검색 요청:', { query, display });
       
       // 필수 파라미터 검증
       if (!query || query.trim() === '') {
@@ -53,7 +53,7 @@ class StoresController {
       }
       
     } catch (error) {
-      console.error('❌ 매장 검색 오류:', error);
+      console.error('[ERROR] 매장 검색 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -71,7 +71,7 @@ class StoresController {
     try {
       const { name, address, roadAddress, district, x, y } = req.body;
       
-      console.log('🔍 Place ID 추출 요청:', { name, address, district });
+      console.log('[INFO] Place ID 추출 요청:', { name, address, district });
       
       // 필수 파라미터 검증
       if (!name || name.trim() === '') {
@@ -112,7 +112,7 @@ class StoresController {
       }
       
     } catch (error) {
-      console.error('❌ Place ID 추출 오류:', error);
+      console.error('[ERROR] Place ID 추출 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -137,7 +137,7 @@ class StoresController {
       });
       
     } catch (error) {
-      console.error('❌ 상태 확인 오류:', error);
+      console.error('[ERROR] 상태 확인 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -155,7 +155,7 @@ class StoresController {
     try {
       const { placeId } = req.body;
       
-      console.log('🔍 Place ID 검증 요청:', { placeId });
+      console.log('[INFO] Place ID 검증 요청:', { placeId });
       
       // 필수 파라미터 검증
       if (!placeId || placeId.trim() === '') {
@@ -176,7 +176,7 @@ class StoresController {
       });
       
     } catch (error) {
-      console.error('❌ Place ID 검증 오류:', error);
+      console.error('[ERROR] Place ID 검증 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message,

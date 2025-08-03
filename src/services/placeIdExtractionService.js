@@ -20,13 +20,13 @@ class PlaceIdExtractionService {
    * @returns {Promise<Object>} 추출 결과
    */
   async extractPlaceId(storeInfo) {
-    console.log(`🔍 ${storeInfo.name} Place ID 추출 시작...`);
+    console.log(`[INFO] ${storeInfo.name} Place ID 추출 시작...`);
     
     // 방법 1: 네이버 검색 스크래핑 (가장 안정적)
     try {
       const scrapingResult = await this.trySearchScraping(storeInfo);
       if (scrapingResult && scrapingResult.placeId) {
-        console.log(`✅ 스크래핑 성공: ${scrapingResult.placeId}`);
+        console.log(`[SUCCESS] 스크래핑 성공: ${scrapingResult.placeId}`);
         return {
           ...scrapingResult,
           extractionMethod: 'scraping',
@@ -35,14 +35,14 @@ class PlaceIdExtractionService {
         };
       }
     } catch (error) {
-      console.log(`❌ 스크래핑 실패: ${error.message}`);
+      console.log(`[ERROR] 스크래핑 실패: ${error.message}`);
     }
 
     // 방법 2: allSearch API (빠르지만 제한적)
     try {
       const allSearchResult = await this.tryAllSearchAPI(storeInfo);
       if (allSearchResult && allSearchResult.placeId) {
-        console.log(`✅ allSearch 성공: ${allSearchResult.placeId}`);
+        console.log(`[SUCCESS] allSearch 성공: ${allSearchResult.placeId}`);
         return {
           ...allSearchResult,
           extractionMethod: 'allsearch',
@@ -51,7 +51,7 @@ class PlaceIdExtractionService {
         };
       }
     } catch (error) {
-      console.log(`❌ allSearch 실패: ${error.message}`);
+      console.log(`[ERROR] allSearch 실패: ${error.message}`);
     }
 
     // 모든 자동 방법 실패 시 수동 안내
@@ -77,7 +77,7 @@ class PlaceIdExtractionService {
   async trySearchScraping(storeInfo) {
     try {
       const searchQuery = `${storeInfo.name} ${storeInfo.district || ''}`.trim();
-      console.log(`🔍 네이버 검색 스크래핑: "${searchQuery}"`);
+      console.log(`[INFO] 네이버 검색 스크래핑: "${searchQuery}"`);
       
       const searchUrl = `https://search.naver.com/search.naver?where=nexearch&query=${encodeURIComponent(searchQuery)}&sm=top_hty&fbm=0&ie=utf8`;
       
@@ -106,7 +106,7 @@ class PlaceIdExtractionService {
           const matches = html.match(pattern);
           if (matches && matches.length > 0) {
             const placeId = matches[0].match(/\d+/)[0];
-            console.log(`✅ Place ID 발견: ${placeId}`);
+            console.log(`[SUCCESS] Place ID 발견: ${placeId}`);
             
             return {
               placeId: placeId,
@@ -122,7 +122,7 @@ class PlaceIdExtractionService {
       throw new Error('검색 결과에서 Place ID를 찾을 수 없습니다');
       
     } catch (error) {
-      console.log(`❌ 스크래핑 실패: ${error.message}`);
+              console.log(`[ERROR] 스크래핑 실패: ${error.message}`);
       return null;
     }
   }
@@ -139,7 +139,7 @@ class PlaceIdExtractionService {
       storeInfo.address || ''
     ].filter(pattern => pattern.trim().length > 0);
     
-    console.log(`🔍 allSearch API 시도:`, searchPatterns);
+    console.log(`[INFO] allSearch API 시도:`, searchPatterns);
     
     for (const pattern of searchPatterns) {
       try {
@@ -183,7 +183,7 @@ class PlaceIdExtractionService {
         await this.delay(1000);
         
       } catch (error) {
-        console.log(`⚠️ allSearch 패턴 실패: ${error.message}`);
+        console.log(`[WARNING] allSearch 패턴 실패: ${error.message}`);
         continue;
       }
     }
