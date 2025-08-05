@@ -2,38 +2,42 @@
  * @swagger
  * tags:
  *   name: Stores
- *   description: 매장 검색 및 Place ID 추출 관련 API
+ *   description: 매장 검색 및 Place ID 추출 관련 API (7단계 플로우)
  */
 
 const express = require('express');
 const router = express.Router();
-const storesController = require('../controllers/storesController');
+const StoresController = require('../controllers/storesController');
 
-// 매장 검색 엔드포인트
+// 컨트롤러 인스턴스 생성
+const storesController = new StoresController();
+
+// ===== 1단계: 매장 검색 =====
 /**
  * @swagger
  * /api/stores/search:
- *   get:
- *     summary: 매장 검색
- *     description: 상호명이나 주소로 매장을 검색합니다.
+ *   post:
+ *     summary: 1단계 - 매장 검색
+ *     description: 사용자가 매장명/주소로 매장을 검색합니다.
  *     tags: [Stores]
- *     parameters:
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *         description: 검색어 (상호명 또는 주소)
- *         example: "신월3동 칼포니치킨"
- *       - in: query
- *         name: display
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 10
- *           default: 5
- *         description: 검색 결과 수
- *         example: 5
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - query
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: 검색어 (상호명 또는 주소)
+ *                 example: "신월3동 칼포니치킨"
+ *               display:
+ *                 type: integer
+ *                 default: 10
+ *                 description: 검색 결과 수
+ *                 example: 10
  *     responses:
  *       200:
  *         description: 매장 검색 성공
@@ -46,66 +50,56 @@ const storesController = require('../controllers/storesController');
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       name:
- *                         type: string
- *                         example: "칼포니치킨"
- *                       address:
- *                         type: string
- *                         example: "서울특별시 양천구 신월로 128"
- *                       roadAddress:
- *                         type: string
- *                         example: "서울특별시 양천구 신월로 128"
- *                       phone:
- *                         type: string
- *                         example: "02-1234-5678"
- *                       category:
- *                         type: string
- *                         example: "음식점>치킨"
- *                       coordinates:
+ *                   type: object
+ *                   properties:
+ *                     query:
+ *                       type: string
+ *                       example: "신월3동 칼포니치킨"
+ *                     totalCount:
+ *                       type: integer
+ *                       example: 5
+ *                     stores:
+ *                       type: array
+ *                       items:
  *                         type: object
  *                         properties:
- *                           x:
+ *                           title:
+ *                             type: string
+ *                             example: "칼포니치킨"
+ *                           address:
+ *                             type: string
+ *                             example: "서울특별시 양천구 신월로 128"
+ *                           roadAddress:
+ *                             type: string
+ *                             example: "서울특별시 양천구 신월로 128"
+ *                           telephone:
+ *                             type: string
+ *                             example: "02-1234-5678"
+ *                           category:
+ *                             type: string
+ *                             example: "음식점>치킨"
+ *                           mapx:
  *                             type: string
  *                             example: "1269780493"
- *                           y:
+ *                           mapy:
  *                             type: string
  *                             example: "375672475"
- *                 total:
- *                   type: integer
- *                   example: 5
+ *                     searchedAt:
+ *                       type: string
+ *                       example: "2024-01-15T22:30:00.000Z"
  *                 message:
  *                   type: string
  *                   example: "5개의 매장을 찾았습니다."
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "검색어가 필요합니다."
- *                 message:
- *                   type: string
- *                   example: "검색어를 입력해주세요."
  */
-router.get('/search', storesController.searchStores);
+router.post('/search', storesController.searchStores.bind(storesController));
 
-// Place ID 추출 엔드포인트 (개선된 버전)
+// ===== 2단계: 사용자 매장 선택 =====
 /**
  * @swagger
- * /api/stores/extract-place-id:
+ * /api/stores/select:
  *   post:
- *     summary: Place ID 추출 (개선된 버전)
- *     description: 여러 방법을 순차적으로 시도하여 네이버 지도에서 Place ID를 추출합니다.
+ *     summary: 2단계 - 사용자 매장 선택
+ *     description: 검색 결과에서 사용자가 선택한 매장의 상세 정보를 반환합니다.
  *     tags: [Stores]
  *     requestBody:
  *       required: true
@@ -114,32 +108,97 @@ router.get('/search', storesController.searchStores);
  *           schema:
  *             type: object
  *             required:
- *               - name
+ *               - selectedIndex
  *             properties:
- *               name:
- *                 type: string
- *                 description: 매장명
- *                 example: "칼포니치킨"
- *               address:
- *                 type: string
- *                 description: 주소
- *                 example: "서울특별시 양천구 신월동 1002-4"
- *               roadAddress:
- *                 type: string
- *                 description: 도로명주소
- *                 example: "서울특별시 양천구 신월로 128"
- *               district:
- *                 type: string
- *                 description: 지역명
- *                 example: "신월동"
- *               x:
- *                 type: string
- *                 description: X 좌표
- *                 example: "1268381536"
- *               y:
- *                 type: string
- *                 description: Y 좌표
- *                 example: "375164998"
+ *               selectedIndex:
+ *                 type: integer
+ *                 description: 선택한 매장의 인덱스 (0부터 시작)
+ *                 example: 0
+ *     responses:
+ *       200:
+ *         description: 매장 선택 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     selectedStore:
+ *                       type: object
+ *                       properties:
+ *                         title:
+ *                           type: string
+ *                           example: "칼포니치킨"
+ *                         address:
+ *                           type: string
+ *                           example: "서울특별시 양천구 신월로 128"
+ *                         roadAddress:
+ *                           type: string
+ *                           example: "서울특별시 양천구 신월로 128"
+ *                         telephone:
+ *                           type: string
+ *                           example: "02-1234-5678"
+ *                         category:
+ *                           type: string
+ *                           example: "음식점>치킨"
+ *                         mapx:
+ *                           type: string
+ *                           example: "1269780493"
+ *                         mapy:
+ *                           type: string
+ *                           example: "375672475"
+ *                     selectedAt:
+ *                       type: string
+ *                       example: "2024-01-15T22:30:00.000Z"
+ *                 message:
+ *                   type: string
+ *                   example: "매장이 선택되었습니다: 칼포니치킨"
+ */
+router.post('/select', storesController.selectStore.bind(storesController));
+
+// ===== 3단계: Place ID 추출 (다단계 시도) =====
+/**
+ * @swagger
+ * /api/stores/extract-place-id:
+ *   post:
+ *     summary: 3단계 - Place ID 추출 (다단계 시도)
+ *     description: 선택된 매장의 Place ID를 여러 방법으로 추출합니다. 2-1 스크래핑, 2-2 allSearch API, 2-3 수동 확인
+ *     tags: [Stores]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - storeData
+ *             properties:
+ *               storeData:
+ *                 type: object
+ *                 properties:
+ *                   title:
+ *                     type: string
+ *                     example: "칼포니치킨"
+ *                   address:
+ *                     type: string
+ *                     example: "서울특별시 양천구 신월동 1002-4"
+ *                   roadAddress:
+ *                     type: string
+ *                     example: "서울특별시 양천구 신월로 128"
+ *                   category:
+ *                     type: string
+ *                     example: "음식점>치킨"
+ *                   mapx:
+ *                     type: string
+ *                     example: "1268381536"
+ *                   mapy:
+ *                     type: string
+ *                     example: "375164998"
  *     responses:
  *       200:
  *         description: Place ID 추출 성공
@@ -165,72 +224,46 @@ router.get('/search', storesController.searchStores);
  *                       example: "https://m.place.naver.com/place/1234567890/review"
  *                     extractionMethod:
  *                       type: string
- *                       example: "selenium"
+ *                       example: "scraping"
+ *                     extractionSteps:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           step:
+ *                             type: string
+ *                             example: "2-1"
+ *                           method:
+ *                             type: string
+ *                             example: "스크래핑"
+ *                           success:
+ *                             type: boolean
+ *                             example: true
+ *                           placeId:
+ *                             type: string
+ *                             example: "1234567890"
  *                     successRate:
  *                       type: number
- *                       example: 0.95
+ *                       example: 0.85
  *                     confidence:
  *                       type: number
- *                       example: 0.95
+ *                       example: 0.85
  *                     extractedAt:
  *                       type: string
  *                       example: "2024-01-15T22:30:00.000Z"
  *                 message:
  *                   type: string
- *                   example: "Place ID를 성공적으로 추출했습니다: 1234567890"
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "매장명이 필요합니다."
- *                 message:
- *                   type: string
- *                   example: "매장명을 입력해주세요."
- *       404:
- *         description: Place ID 추출 실패
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 data:
- *                   type: object
- *                   properties:
- *                     manualSteps:
- *                       type: array
- *                       items:
- *                         type: string
- *                       example: ["1. https://map.naver.com 접속", "2. 매장 검색", "3. URL에서 Place ID 확인"]
- *                     method:
- *                       type: string
- *                       example: "manual"
- *                     successRate:
- *                       type: number
- *                       example: 1.0
- *                 message:
- *                   type: string
- *                   example: "자동 추출에 실패했습니다. 수동으로 확인해주세요."
+ *                   example: "Place ID를 성공적으로 추출했습니다: 1234567890 (스크래핑 방식)"
  */
-router.post('/extract-place-id', storesController.extractPlaceId);
+router.post('/extract-place-id', storesController.extractPlaceId.bind(storesController));
 
-// Place ID 추출 상태 확인 엔드포인트
+// ===== 4단계: Place ID 추출 상태 확인 =====
 /**
  * @swagger
  * /api/stores/extract-place-id/status:
  *   get:
- *     summary: Place ID 추출 상태 확인
- *     description: 현재 Place ID 추출 시스템의 상태와 성공률을 확인합니다.
+ *     summary: 4단계 - Place ID 추출 상태 확인
+ *     description: 각 추출 방법별 성공률과 시스템 상태를 확인합니다.
  *     tags: [Stores]
  *     responses:
  *       200:
@@ -249,45 +282,45 @@ router.post('/extract-place-id', storesController.extractPlaceId);
  *                     methods:
  *                       type: object
  *                       properties:
- *                         allsearch:
+ *                         "2-1":
  *                           type: object
  *                           properties:
- *                             successRate:
- *                               type: number
- *                               example: 0.3
- *                             description:
+ *                             name:
  *                               type: string
- *                               example: "네이버 지도 allSearch API"
- *                         selenium:
- *                           type: object
- *                           properties:
+ *                               example: "스크래핑"
  *                             successRate:
  *                               type: number
- *                               example: 0.95
- *                             description:
- *                               type: string
- *                               example: "브라우저 자동화 (Puppeteer)"
- *                         scraping:
- *                           type: object
- *                           properties:
- *                             successRate:
- *                               type: number
- *                               example: 0.8
+ *                               example: 0.85
  *                             description:
  *                               type: string
  *                               example: "네이버 검색 스크래핑"
- *                         manual:
+ *                         "2-2":
  *                           type: object
  *                           properties:
+ *                             name:
+ *                               type: string
+ *                               example: "allSearch API"
+ *                             successRate:
+ *                               type: number
+ *                               example: 0.4
+ *                             description:
+ *                               type: string
+ *                               example: "네이버 지도 allSearch API"
+ *                         "2-3":
+ *                           type: object
+ *                           properties:
+ *                             name:
+ *                               type: string
+ *                               example: "수동 확인"
  *                             successRate:
  *                               type: number
  *                               example: 1.0
  *                             description:
  *                               type: string
- *                               example: "수동 확인"
+ *                               example: "수동 확인 안내"
  *                     overallSuccessRate:
  *                       type: number
- *                       example: 0.95
+ *                       example: 0.85
  *                     lastUpdated:
  *                       type: string
  *                       example: "2024-01-15T22:30:00.000Z"
@@ -295,15 +328,15 @@ router.post('/extract-place-id', storesController.extractPlaceId);
  *                   type: string
  *                   example: "Place ID 추출 시스템 상태 확인 완료"
  */
-router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStatus);
+router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStatus.bind(storesController));
 
-// Place ID 검증 엔드포인트
+// ===== 5단계: 매장 정보 저장 =====
 /**
  * @swagger
- * /api/stores/validate-place-id:
+ * /api/stores/save:
  *   post:
- *     summary: Place ID 검증
- *     description: Place ID가 유효한지 확인하고 관련 정보를 반환합니다.
+ *     summary: 5단계 - 매장 정보 저장
+ *     description: Place ID가 추출된 매장 정보를 데이터베이스에 저장합니다.
  *     tags: [Stores]
  *     requestBody:
  *       required: true
@@ -312,15 +345,38 @@ router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStat
  *           schema:
  *             type: object
  *             required:
- *               - placeId
+ *               - storeData
  *             properties:
- *               placeId:
- *                 type: string
- *                 description: 검증할 Place ID
- *                 example: "1234567890"
+ *               storeData:
+ *                 type: object
+ *                 properties:
+ *                   title:
+ *                     type: string
+ *                     example: "칼포니치킨"
+ *                   address:
+ *                     type: string
+ *                     example: "서울특별시 양천구 신월로 128"
+ *                   roadAddress:
+ *                     type: string
+ *                     example: "서울특별시 양천구 신월로 128"
+ *                   telephone:
+ *                     type: string
+ *                     example: "02-1234-5678"
+ *                   category:
+ *                     type: string
+ *                     example: "음식점>치킨"
+ *                   placeId:
+ *                     type: string
+ *                     example: "1234567890"
+ *                   placeUrl:
+ *                     type: string
+ *                     example: "https://m.place.naver.com/place/1234567890/home"
+ *                   reviewUrl:
+ *                     type: string
+ *                     example: "https://m.place.naver.com/place/1234567890/review"
  *     responses:
  *       200:
- *         description: Place ID 검증 성공
+ *         description: 매장 저장 성공
  *         content:
  *           application/json:
  *             schema:
@@ -332,438 +388,37 @@ router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStat
  *                 data:
  *                   type: object
  *                   properties:
- *                     isValid:
- *                       type: boolean
- *                       example: true
- *                     placeId:
- *                       type: string
- *                       example: "1234567890"
- *                     placeUrl:
- *                       type: string
- *                       example: "https://m.place.naver.com/place/1234567890/home"
- *                     reviewUrl:
- *                       type: string
- *                       example: "https://m.place.naver.com/place/1234567890/review"
- *                     storeInfo:
+ *                     storeId:
+ *                       type: integer
+ *                       example: 1
+ *                     store:
  *                       type: object
  *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 1
  *                         name:
  *                           type: string
  *                           example: "칼포니치킨"
- *                         address:
- *                           type: string
- *                           example: "서울특별시 양천구 신월로 128"
- *                 message:
- *                   type: string
- *                   example: "Place ID가 유효합니다."
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "Place ID가 필요합니다."
- *                 message:
- *                   type: string
- *                   example: "Place ID를 입력해주세요."
- */
-router.post('/validate-place-id', storesController.validatePlaceId);
-
-// 통합 매장 검색 엔드포인트
-/**
- * @swagger
- * /api/stores/find:
- *   post:
- *     summary: 통합 매장 검색
- *     description: 상호명이나 주소로 매장을 검색하고 Place ID를 추출합니다.
- *     tags: [Stores]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - query
- *             properties:
- *               query:
- *                 type: string
- *                 description: 검색어 (상호명 또는 주소)
- *                 example: "신월3동 칼포니치킨"
- *               extractPlaceId:
- *                 type: boolean
- *                 default: true
- *                 description: Place ID 추출 여부
- *                 example: true
- *     responses:
- *       200:
- *         description: 통합 매장 검색 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       name:
- *                         type: string
- *                         example: "칼포니치킨"
- *                       address:
- *                         type: string
- *                         example: "서울특별시 양천구 신월로 128"
- *                       placeId:
- *                         type: string
- *                         example: "1234567890"
- *                       mapUrl:
- *                         type: string
- *                         example: "https://map.naver.com/p/entry/place/1234567890"
- *                 total:
- *                   type: integer
- *                   example: 1
- *                 message:
- *                   type: string
- *                   example: "1개의 매장을 찾았습니다. Place ID 추출을 완료했습니다."
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "검색어가 필요합니다."
- *                 message:
- *                   type: string
- *                   example: "검색어를 입력해주세요."
- */
-router.post('/find', storesController.findStoreByQuery);
-
-// 해커톤용 통합 매장 검색 엔드포인트
-/**
- * @swagger
- * /api/stores/find-with-selection:
- *   post:
- *     summary: 해커톤용 통합 매장 검색 (검색 + Place ID 추출)
- *     description: 상호명이나 주소로 매장을 검색하고 선택된 매장의 Place ID를 추출합니다.
- *     tags: [Stores]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - query
- *             properties:
- *               query:
- *                 type: string
- *                 description: 검색어 (상호명 또는 주소)
- *                 example: "신월3동 칼포니치킨"
- *               selectedIndex:
- *                 type: integer
- *                 default: 0
- *                 description: 사용자가 선택한 매장 인덱스 (0부터 시작)
- *                 example: 0
- *     responses:
- *       200:
- *         description: 통합 매장 검색 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     selectedStore:
- *                       type: object
- *                       properties:
- *                         name:
- *                           type: string
- *                           example: "칼포니치킨"
- *                         address:
- *                           type: string
- *                           example: "서울특별시 양천구 신월동 1002-4"
- *                         placeId:
+ *                         place_id:
  *                           type: string
  *                           example: "1234567890"
- *                         mapUrl:
- *                           type: string
- *                           example: "https://map.naver.com/p/entry/place/1234567890"
- *                     allStores:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           name:
- *                             type: string
- *                           address:
- *                             type: string
- *                           coordinates:
- *                             type: object
- *                             properties:
- *                               x:
- *                                 type: string
- *                               y:
- *                                 type: string
- *                 total:
- *                   type: integer
- *                   example: 3
- *                 selectedIndex:
- *                   type: integer
- *                   example: 0
- *                 message:
- *                   type: string
- *                   example: "3개의 매장을 찾았습니다. 선택된 매장: 칼포니치킨"
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "검색어가 필요합니다."
- *                 message:
- *                   type: string
- *                   example: "검색어를 입력해주세요."
- */
-router.post('/find-with-selection', storesController.findStoreWithSelection);
-
-// 선택된 매장의 Place ID 추출 엔드포인트
-/**
- * @swagger
- * /api/stores/extract-place-id-for-selected:
- *   post:
- *     summary: 선택된 매장의 Place ID 추출 (사용자 선택 기반)
- *     description: 매장 검색 후 사용자가 선택한 매장의 좌표를 이용해 Place ID를 추출합니다.
- *     tags: [Stores]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - query
- *             properties:
- *               query:
- *                 type: string
- *                 description: 검색어 (상호명 또는 주소)
- *                 example: "스타벅스"
- *               selectedIndex:
- *                 type: integer
- *                 default: 0
- *                 description: 사용자가 선택한 매장 인덱스 (0부터 시작)
- *                 example: 2
- *               extractPlaceId:
- *                 type: boolean
- *                 default: true
- *                 description: Place ID 추출 여부
- *                 example: true
- *     responses:
- *       200:
- *         description: 선택된 매장 Place ID 추출 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     selectedStore:
- *                       type: object
- *                       properties:
- *                         name:
- *                           type: string
- *                           example: "스타벅스 강남점"
- *                         address:
- *                           type: string
- *                           example: "서울특별시 강남구 역삼동 123-45"
- *                         placeId:
- *                           type: string
- *                           example: "1234567890"
- *                         mapUrl:
- *                           type: string
- *                           example: "https://map.naver.com/p/entry/place/1234567890"
- *                         coordinates:
- *                           type: object
- *                           properties:
- *                             x:
- *                               type: string
- *                               example: "1270280000"
- *                             y:
- *                               type: string
- *                               example: "374500000"
- *                     allStores:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           name:
- *                             type: string
- *                           address:
- *                             type: string
- *                           coordinates:
- *                             type: object
- *                             properties:
- *                               x:
- *                                 type: string
- *                               y:
- *                                 type: string
- *                     total:
- *                       type: integer
- *                       example: 5
- *                     selectedIndex:
- *                       type: integer
- *                       example: 2
- *                     placeIdExtraction:
- *                       type: object
- *                       properties:
- *                         success:
- *                           type: boolean
- *                           example: true
- *                         message:
- *                           type: string
- *                           example: "Place ID를 성공적으로 추출했습니다: 1234567890"
- *                 message:
- *                   type: string
- *                   example: "5개의 매장을 찾았습니다. 선택된 매장: 스타벅스 강남점 (Place ID: 1234567890)"
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "검색어가 필요합니다."
- *                 message:
- *                   type: string
- *                   example: "검색어를 입력해주세요."
- */
-router.post('/extract-place-id-for-selected', storesController.extractPlaceIdForSelectedStore);
-
-// allSearch API 직접 호출 엔드포인트
-/**
- * @swagger
- * /api/stores/extract-place-id-by-coordinates:
- *   post:
- *     summary: 좌표 기반 Place ID 추출 (allSearch API)
- *     description: 매장명과 좌표를 이용해 allSearch API로 Place ID를 추출합니다.
- *     tags: [Stores]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - query
- *               - mapx
- *               - mapy
- *             properties:
- *               query:
- *                 type: string
- *                 description: 매장명
- *                 example: "칼포니치킨"
- *               mapx:
- *                 type: string
- *                 description: X 좌표
- *                 example: "1268381536"
- *               mapy:
- *                 type: string
- *                 description: Y 좌표
- *                 example: "375164998"
- *     responses:
- *       200:
- *         description: Place ID 추출 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     placeId:
- *                       type: string
- *                       example: "1234567890"
- *                     name:
- *                       type: string
- *                       example: "칼포니치킨"
- *                     address:
- *                       type: string
- *                       example: "서울특별시 양천구 신월동 1002-4"
- *                     mapUrl:
- *                       type: string
- *                       example: "https://map.naver.com/p/entry/place/1234567890"
- *                     extractedAt:
+ *                     savedAt:
  *                       type: string
  *                       example: "2024-01-15T22:30:00.000Z"
  *                 message:
  *                   type: string
- *                   example: "Place ID를 성공적으로 추출했습니다: 1234567890"
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "필수 파라미터가 누락되었습니다."
- *                 message:
- *                   type: string
- *                   example: "매장명과 좌표를 모두 입력해주세요."
+ *                   example: "매장 정보가 성공적으로 저장되었습니다."
  */
-router.post('/extract-place-id-by-coordinates', storesController.extractPlaceIdByCoordinates);
+router.post('/save', storesController.saveStore.bind(storesController));
 
-// 수동 Place ID 확인 엔드포인트
+// ===== 6단계: 리뷰 크롤링 요청 =====
 /**
  * @swagger
- * /api/stores/manual-place-id-check:
+ * /api/stores/crawl-reviews:
  *   post:
- *     summary: 수동 Place ID 확인 안내
- *     description: Place ID 추출 실패 시 수동으로 확인할 수 있는 방법을 안내합니다.
+ *     summary: 6단계 - 리뷰 크롤링 요청
+ *     description: 저장된 매장의 Place ID를 이용해 리뷰를 크롤링합니다.
  *     tags: [Stores]
  *     requestBody:
  *       required: true
@@ -772,20 +427,21 @@ router.post('/extract-place-id-by-coordinates', storesController.extractPlaceIdB
  *           schema:
  *             type: object
  *             required:
- *               - query
- *               - selectedIndex
+ *               - storeId
  *             properties:
- *               query:
- *                 type: string
- *                 description: 검색어
- *                 example: "신월3동 칼포니치킨"
- *               selectedIndex:
+ *               storeId:
  *                 type: integer
- *                 description: 선택된 매장 인덱스
- *                 example: 0
+ *                 description: 저장된 매장 ID
+ *                 example: 1
+ *               level:
+ *                 type: string
+ *                 enum: [basic, intermediate, advanced]
+ *                 default: basic
+ *                 description: 크롤링 레벨
+ *                 example: basic
  *     responses:
  *       200:
- *         description: 수동 확인 안내 성공
+ *         description: 리뷰 크롤링 성공
  *         content:
  *           application/json:
  *             schema:
@@ -797,34 +453,222 @@ router.post('/extract-place-id-by-coordinates', storesController.extractPlaceIdB
  *                 data:
  *                   type: object
  *                   properties:
- *                     storeInfo:
+ *                     reviewId:
+ *                       type: integer
+ *                       example: 1
+ *                     storeId:
+ *                       type: integer
+ *                       example: 1
+ *                     placeId:
+ *                       type: string
+ *                       example: "1234567890"
+ *                     level:
+ *                       type: string
+ *                       example: "basic"
+ *                     reviews:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           author:
+ *                             type: string
+ *                             example: "사용자1"
+ *                           content:
+ *                             type: string
+ *                             example: "맛있고 친절해요!"
+ *                           visitDate:
+ *                             type: string
+ *                             example: "2024년 1월 15일"
+ *                     totalCount:
+ *                       type: integer
+ *                       example: 10
+ *                     crawledAt:
+ *                       type: string
+ *                       example: "2024-01-15T22:30:00.000Z"
+ *                 message:
+ *                   type: string
+ *                   example: "10개의 리뷰를 성공적으로 크롤링했습니다."
+ */
+router.post('/crawl-reviews', storesController.crawlReviews.bind(storesController));
+
+// ===== 7단계: AI 분석 =====
+/**
+ * @swagger
+ * /api/stores/analyze-reviews:
+ *   post:
+ *     summary: 7단계 - AI 분석
+ *     description: 크롤링된 리뷰를 AI로 분석하여 감성 분석, 키워드 추출 등을 수행합니다.
+ *     tags: [Stores]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reviewId
+ *             properties:
+ *               reviewId:
+ *                 type: integer
+ *                 description: 크롤링된 리뷰 ID
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: AI 분석 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     analysisId:
+ *                       type: integer
+ *                       example: 1
+ *                     reviewId:
+ *                       type: integer
+ *                       example: 1
+ *                     storeId:
+ *                       type: integer
+ *                       example: 1
+ *                     sentiment:
  *                       type: object
  *                       properties:
- *                         name:
+ *                         overall:
  *                           type: string
- *                           example: "칼포니치킨"
- *                         address:
- *                           type: string
- *                           example: "서울특별시 양천구 신월동 1002-4"
- *                     manualCheckSteps:
+ *                           example: "긍정적"
+ *                         positive:
+ *                           type: integer
+ *                           example: 15
+ *                         negative:
+ *                           type: integer
+ *                           example: 3
+ *                     keywords:
  *                       type: array
  *                       items:
  *                         type: string
- *                       example: [
- *                         "1. https://map.naver.com 접속",
- *                         "2. '칼포니치킨 신월동' 검색",
- *                         "3. 검색 결과에서 해당 매장 클릭",
- *                         "4. URL에서 /place/숫자 부분 확인"
- *                       ]
- *                     searchUrl:
- *                   type: string
- *                   example: "https://map.naver.com/v5/search/칼포니치킨%20신월동"
+ *                       example: ["맛", "서비스", "친절"]
+ *                     satisfactionScore:
+ *                       type: integer
+ *                       example: 85
+ *                     improvementPoints:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       example: ["느리다"]
+ *                     summary:
+ *                       type: string
+ *                       example: "10개 리뷰 분석 결과, 전반적으로 긍정적인 평가를 받고 있습니다."
+ *                     analyzedAt:
+ *                       type: string
+ *                       example: "2024-01-15T22:30:00.000Z"
  *                 message:
  *                   type: string
- *                   example: "수동 확인 방법을 안내합니다."
+ *                   example: "리뷰 AI 분석이 완료되었습니다."
  */
-router.post('/manual-place-id-check', storesController.manualPlaceIdCheck);
+router.post('/analyze-reviews', storesController.analyzeReviews.bind(storesController));
 
-// Place ID 수동 입력 엔드포인트 (임시 비활성화)
+// ===== 전체 플로우 (선택사항) =====
+/**
+ * @swagger
+ * /api/stores/full-flow:
+ *   post:
+ *     summary: 전체 플로우 실행 (1-7단계 통합)
+ *     description: 1단계부터 7단계까지의 전체 플로우를 한 번에 실행합니다.
+ *     tags: [Stores]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - query
+ *               - selectedStoreIndex
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: 검색어 (상호명 또는 주소)
+ *                 example: "신월3동 칼포니치킨"
+ *               selectedStoreIndex:
+ *                 type: integer
+ *                 description: 사용자가 선택한 매장 인덱스 (0부터 시작)
+ *                 example: 0
+ *               level:
+ *                 type: string
+ *                 enum: [basic, intermediate, advanced]
+ *                 default: basic
+ *                 description: 리뷰 크롤링 레벨
+ *                 example: basic
+ *     responses:
+ *       200:
+ *         description: 전체 플로우 실행 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     searchResult:
+ *                       type: object
+ *                       properties:
+ *                         query:
+ *                           type: string
+ *                           example: "신월3동 칼포니치킨"
+ *                         totalCount:
+ *                           type: integer
+ *                           example: 5
+ *                         selectedStore:
+ *                           type: object
+ *                           properties:
+ *                             title:
+ *                               type: string
+ *                               example: "칼포니치킨"
+ *                             placeId:
+ *                               type: string
+ *                               example: "1234567890"
+ *                     storeId:
+ *                       type: integer
+ *                       example: 1
+ *                     reviewId:
+ *                       type: integer
+ *                       example: 1
+ *                     analysisId:
+ *                       type: integer
+ *                       example: 1
+ *                     analysis:
+ *                       type: object
+ *                       properties:
+ *                         sentiment:
+ *                           type: object
+ *                           properties:
+ *                             overall:
+ *                               type: string
+ *                               example: "긍정적"
+ *                         keywords:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                           example: ["맛", "서비스", "친절"]
+ *                         satisfactionScore:
+ *                           type: integer
+ *                           example: 85
+ *                     completedAt:
+ *                       type: string
+ *                       example: "2024-01-15T22:30:00.000Z"
+ *                 message:
+ *                   type: string
+ *                   example: "전체 플로우가 성공적으로 완료되었습니다."
+ */
+router.post('/full-flow', storesController.executeFullFlow.bind(storesController));
 
 module.exports = router; 

@@ -12,6 +12,10 @@ router.get('/sales', (req, res) => {
   res.json({ message: '매출 분석 기능 (예시)' });
 });
 
+// 인증 관련 라우트
+const authRoutes = require('./routes/auth');
+router.use('/auth', authRoutes);
+
 // 리뷰 관련 라우트
 const reviewsRoutes = require('./routes/reviews');
 router.use('/reviews', reviewsRoutes);

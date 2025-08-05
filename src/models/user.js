@@ -1,5 +1,5 @@
 // Supabase(PostgreSQL) 기반 사용자 쿼리 예시
-const supabase = require('../config/db');
+const { supabase } = require('../config/db');
 
 /**
  * 사용자 ID로 유저 정보 조회

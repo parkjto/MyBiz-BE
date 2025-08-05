@@ -1,10 +1,16 @@
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-const supabase = require('../config/db');
+const db = require('../config/db');
+const { supabase, supabaseAdmin } = db;
 
 const KAKAO_CLIENT_ID = process.env.KAKAO_CLIENT_ID;
 const KAKAO_REDIRECT_URI = process.env.KAKAO_REDIRECT_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
+
+// 환경변수 검증
+if (!KAKAO_CLIENT_ID) throw new Error('KAKAO_CLIENT_ID 환경변수가 설정되지 않았습니다.');
+if (!KAKAO_REDIRECT_URI) throw new Error('KAKAO_REDIRECT_URI 환경변수가 설정되지 않았습니다.');
+if (!JWT_SECRET) throw new Error('JWT_SECRET 환경변수가 설정되지 않았습니다.');
 
 exports.kakaoLogin = async (code) => {
   if (!code) throw new Error('카카오 인가 코드가 필요합니다.');
@@ -45,24 +51,63 @@ exports.kakaoLogin = async (code) => {
     .maybeSingle();
   if (userError) throw userError;
 
+  let isNewUser = false;
+
   if (!user) {
-    // 신규 회원가입
-    // 이메일이 없을 경우 fallback 처리
-    const email = kakaoUser.kakao_account?.email || `kakao_${kakaoUser.id}@noemail.com`;
-    const { data: newUser, error } = await supabase
-      .from('users')
-      .insert([{ kakao_id: kakaoUser.id, email }])
-      .select()
-      .single();
-    if (error) throw error;
-    user = newUser;
+    // 신규 회원가입 - created_at, updated_at은 Supabase가 자동 생성
+    isNewUser = true;
+    const userData = {
+      kakao_id: kakaoUser.id.toString(),
+      email: kakaoUser.kakao_account?.email || `kakao_${kakaoUser.id}@noemail.com`,
+      nickname: kakaoUser.properties?.nickname || `카카오사용자_${kakaoUser.id}`,
+      profile_image_url: kakaoUser.properties?.profile_image || null,
+      last_login_at: new Date().toISOString()
+    };
+    
+    try {
+      const { data: newUser, error } = await supabase
+        .from('users')
+        .insert([userData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('[ERROR] 사용자 생성 실패:', error);
+        throw new Error('사용자 생성에 실패했습니다. Supabase RLS 정책을 확인해주세요.');
+      }
+      
+      user = newUser;
+    } catch (error) {
+      console.error('[ERROR] 사용자 생성 중 오류:', error);
+      throw new Error('사용자 생성 중 오류가 발생했습니다: ' + error.message);
+    }
+  } else {
+    // 기존 사용자의 마지막 로그인 시간 업데이트
+    try {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ 
+          last_login_at: new Date().toISOString()
+          // updated_at은 Supabase가 자동으로 처리
+        })
+        .eq('id', user.id);
+      
+      if (updateError) {
+        console.error('[ERROR] 사용자 업데이트 실패:', updateError);
+        // 업데이트 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
+      }
+    } catch (error) {
+      console.error('[ERROR] 사용자 업데이트 중 오류:', error);
+      // 업데이트 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
+    }
   }
 
   // 4. JWT 발급
   const token = jwt.sign({ id: user.id, kakao_id: user.kakao_id }, JWT_SECRET, { expiresIn: '7d' });
 
   return {
-    message: '카카오 로그인 성공',
+    message: isNewUser ? '카카오 회원가입 및 로그인 성공' : '카카오 로그인 성공',
+    isNewUser,
     user,
     token,
   };
