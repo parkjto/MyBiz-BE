@@ -7,21 +7,6 @@ const PORT = process.env.PORT || 3000;
 // 환경설정 및 DB 연결
 require('./config');
 
-// MongoDB 연결
-mongoose.connect(process.env.MONGODB_URI, {
-  dbName: 'mybiz', // 명시적으로 DB 이름 지정
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-});
-
-mongoose.connection.on('connected', () => {
-  console.log('MongoDB 연결 성공');
-});
-
-mongoose.connection.on('error', (err) => {
-  console.error('MongoDB 연결 오류:', err);
-});
-
 // 기본 미들웨어 설정
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
