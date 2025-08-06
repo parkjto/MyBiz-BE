@@ -70,3 +70,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`MyBiz 백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
 });
+
+app.get('/logout', (req, res) => {
+  res.send('MyBiz 로그아웃이 정상적으로 작동되었습니다!');
+});
