@@ -1,0 +1,64 @@
+---
+alwaysApply: true
+---
+# AI 통합 규칙
+
+## 1. 환경·보안
+- OPENAI_API_KEY·CLOVA_API_KEY를 .env에 저장, 누락 시 500 오류 반환.
+- 호출 로그: 토큰·latency·모델명 MongoDB `ai_logs` 컬렉션 저장.
+
+## 2. 프롬프트 템플릿
+
+역할
+당신은 한국 소상공인 경영 도우미입니다.
+지시사항
+	•	7일 매출 예측을 JSON 배열로 반환.
+	•	key: sales_forecast, 항목: date, amount
+컨텍스트
+	•	업종: {{businessType}}
+	•	지역: {{region}}
+	•	최근 매출: {{recentSales}}
+사용자 입력
+{{userQuery}}
+
+## 3. OpenAI 래퍼
+import OpenAI from 'openai';
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export async function chatCompletion({messages, model='gpt-4o', temperature=0.7}) {
+  // 프롬프트 토큰 수 계산용 임시 요청
+  const tokenRes = await client.chat.completions.create({
+    model,
+    messages,
+    temperature,
+    max_tokens: 1, // 최소 토큰으로 프롬프트 토큰만 측정
+    stream: false
+  });
+  const promptTokens = tokenRes.usage?.prompt_tokens || 1024;
+  const maxTokens = Math.ceil(promptTokens * 1.5);
+  const res = await client.chat.completions.create({
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens
+  });
+  return res.choices[0].message;
+}
+
+## 4. TTS/STT
+- TTS: **Naver CLOVA Speech Synthesis** – 200 자 이하 청크.
+- STT: **CLOVA Speech Recognition** 실시간 스트리밍; 실패 시 “다시 말씀해 주세요” 피드백.
+
+## 5. 비용 최적화
+- 입력 토큰 × 1.5 로 `max_tokens` 자동 설정.
+- 동일 질문 5분 Redis 캐시, 일별 예산 초과 시 Slack 알림.
+
+## 6. 테스트 시나리오
+1. “이번 달 매출 요약” 텍스트 → JSON 응답 검증.
+2. 음성 명령 → STT → OpenAI → TTS 재생 확인.
+3. 비속어 입력 → 정중한 톤 유지 여부 확인.
+
+2. 음성 명령 → STT → OpenAI → TTS 재생 확인.
+3. 비속어 입력 → 정중한 톤 유지 여부 확인.
+
+alwaysApply: false
+---
