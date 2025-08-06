@@ -54,4 +54,8 @@ router.post('/kakao/login', authController.kakaoLogin);
 // 로그아웃 예시
 router.post('/logout', authController.logout);
 
+// 네이버 로그인
+router.get('/naverlogin', authController.naverLogin);
+router.get('/naver/callback', authController.naverLoginCallback);
+
 module.exports = router;

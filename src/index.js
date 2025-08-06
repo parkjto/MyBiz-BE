@@ -8,9 +8,6 @@ const PORT = process.env.PORT || 3000;
 // 환경설정
 require('./config');
 
-const logger = require('./middlewares/loggerMiddleware');
-const auth = require('./middlewares/authMiddleware');
-
 // 기본 미들웨어 설정
 app.use(logger); // 요청 로깅
 app.use(express.json());
