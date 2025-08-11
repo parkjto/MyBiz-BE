@@ -1,18 +1,199 @@
 const authService = require('../services/authService');
+const jwt = require('jsonwebtoken');
+
+// 테스트용 환경 확인
+exports.testEnvironment = (req, res) => {
+  try {
+    const environment = {
+      KAKAO_CLIENT_ID: process.env.KAKAO_CLIENT_ID ? '설정됨' : '설정되지 않음',
+      KAKAO_REDIRECT_URI: process.env.KAKAO_REDIRECT_URI || '설정되지 않음',
+      JWT_SECRET: process.env.JWT_SECRET ? '설정됨' : '설정되지 않음'
+    };
+
+    const endpoints = {
+      authUrl: 'GET /api/auth/kakao/auth-url - 카카오 로그인 URL 생성',
+      callback: 'GET /api/auth/kakao/callback - 카카오 콜백 처리',
+      login: 'POST /api/auth/kakao/login - 인가 코드로 로그인',
+      profile: 'GET /api/auth/profile - 사용자 프로필 조회 (JWT 필요)',
+      logout: 'POST /api/auth/logout - 로그아웃'
+    };
+
+    res.json({
+      message: '카카오 로그인 API 테스트',
+      environment,
+      endpoints
+    });
+  } catch (err) {
+    console.error('환경 확인 에러:', err);
+    res.status(500).json({ 
+      success: false,
+      error: '환경 확인 중 오류가 발생했습니다.' 
+    });
+  }
+};
+
+// 카카오 로그인 URL 생성
+exports.getKakaoAuthUrl = (req, res) => {
+  try {
+    const clientId = process.env.KAKAO_CLIENT_ID;
+    const redirectUri = process.env.KAKAO_REDIRECT_URI || 'http://localhost:3000/api/auth/kakao/callback';
+    
+    if (!clientId) {
+      return res.status(500).json({
+        success: false,
+        error: '카카오 클라이언트 ID가 설정되지 않았습니다.'
+      });
+    }
+
+    const authUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+
+    res.json({
+      authUrl,
+      clientId,
+      redirectUri,
+      message: '프론트엔드에서 이 authUrl로 리다이렉트하여 카카오 로그인을 시작하세요.'
+    });
+  } catch (err) {
+    console.error('카카오 로그인 URL 생성 에러:', err);
+    res.status(500).json({
+      success: false,
+      error: '카카오 로그인 URL 생성 중 오류가 발생했습니다.'
+    });
+  }
+};
+
+// 카카오 OAuth 콜백 처리
+exports.handleKakaoCallback = (req, res) => {
+  try {
+    const { code } = req.query;
+    
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        error: '인가 코드가 없습니다.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: '카카오 인가 코드를 성공적으로 받았습니다.',
+      code,
+      instructions: {
+        step1: '이 인가 코드를 복사하세요',
+        step2: 'POST /api/auth/kakao/login API를 호출하세요',
+        step3: 'Request Body에 {"code": "위의_인가_코드"}를 입력하세요'
+      }
+    });
+  } catch (err) {
+    console.error('카카오 콜백 처리 에러:', err);
+    res.status(500).json({
+      success: false,
+      error: '콜백 처리 중 오류가 발생했습니다.'
+    });
+  }
+};
+
+// 사용자 프로필 조회
+exports.getProfile = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Bearer 토큰이 필요합니다.'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await authService.getUserById(decoded.userId);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: '사용자를 찾을 수 없습니다.'
+        });
+      }
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          kakao_id: user.kakao_id,
+          email: user.email,
+          nickname: user.nickname,
+          profile_image_url: user.profile_image_url,
+          created_at: user.created_at,
+          last_login_at: user.last_login_at
+        }
+      });
+    } catch (jwtError) {
+      return res.status(401).json({
+        success: false,
+        error: '유효하지 않은 토큰입니다.'
+      });
+    }
+  } catch (err) {
+    console.error('프로필 조회 에러:', err);
+    res.status(500).json({
+      success: false,
+      error: '프로필 조회 중 오류가 발생했습니다.'
+    });
+  }
+};
 
 exports.kakaoLogin = async (req, res) => {
   const { code } = req.body;
+  
+  if (!code) {
+    return res.status(400).json({ 
+      success: false,
+      error: '카카오 인가 코드가 필요합니다.' 
+    });
+  }
+
   try {
     const result = await authService.kakaoLogin(code);
-    res.json(result);
+    res.json({
+      success: true,
+      ...result
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('카카오 로그인 에러:', err);
+    
+    // 카카오 API 관련 에러인지 확인
+    if (err.message.includes('카카오')) {
+      return res.status(400).json({ 
+        success: false,
+        error: err.message 
+      });
+    }
+    
+    // 기타 에러는 500으로 처리
+    res.status(500).json({ 
+      success: false,
+      error: '로그인 처리 중 오류가 발생했습니다.' 
+    });
   }
 };
 
 exports.logout = (req, res) => {
-  const result = authService.logout();
-  res.json(result);
+  try {
+    const result = authService.logout();
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.error('로그아웃 에러:', err);
+    res.status(500).json({ 
+      success: false,
+      error: '로그아웃 처리 중 오류가 발생했습니다.' 
+    });
+  }
 };
 
 

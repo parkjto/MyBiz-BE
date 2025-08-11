@@ -1,11 +1,10 @@
 /**
  * 스토어 컨트롤러
- * 7단계 플로우: 검색 → 선택 → Place ID 추출 → 상태 확인 → 저장 → 크롤링 → AI 분석
+ * 6단계 플로우: 검색 → 선택 → Place ID 추출 → 상태 확인 → 저장 → AI 분석
  */
 
 const NaverLocalService = require('../services/naverLocalService');
 const PlaceIdExtractionService = require('../services/placeIdExtractionService');
-// 크롤링 서비스 제거됨
 const supabase = require('../utils/supabaseClient');
 
 class StoresController {
@@ -14,7 +13,6 @@ class StoresController {
     
     this.naverLocalService = new NaverLocalService();
     this.placeIdService = new PlaceIdExtractionService();
-    // this.reviewCrawler = new ReviewCrawlerService(); // 크롤링 서비스 제거됨
     
     // 메서드들을 this에 바인딩
     this.searchStores = this.searchStores.bind(this);
@@ -22,7 +20,6 @@ class StoresController {
     this.extractPlaceId = this.extractPlaceId.bind(this);
     this.getPlaceIdExtractionStatus = this.getPlaceIdExtractionStatus.bind(this);
     this.saveStore = this.saveStore.bind(this);
-    // this.crawlReviews = this.crawlReviews.bind(this); // 크롤링 기능 제거됨
     this.analyzeReviews = this.analyzeReviews.bind(this);
     this.executeFullFlow = this.executeFullFlow.bind(this);
     
@@ -339,19 +336,19 @@ class StoresController {
         data: {
           methods: {
             "2-1": {
-              name: "스크래핑",
-              successRate: status.methods.scraping.successRate,
-              description: status.methods.scraping.description
+              name: status.methods["2-1"].name,
+              successRate: status.methods["2-1"].successRate,
+              description: status.methods["2-1"].description
             },
             "2-2": {
-              name: "allSearch API",
-              successRate: status.methods.allsearch.successRate,
-              description: status.methods.allsearch.description
+              name: status.methods["2-2"].name,
+              successRate: status.methods["2-2"].successRate,
+              description: status.methods["2-2"].description
             },
             "2-3": {
-              name: "수동 확인",
-              successRate: status.methods.manual.successRate,
-              description: status.methods.manual.description
+              name: status.methods["2-3"].name,
+              successRate: status.methods["2-3"].successRate,
+              description: status.methods["2-3"].description
             }
           },
           overallSuccessRate: status.overallSuccessRate,
@@ -443,11 +440,7 @@ class StoresController {
     }
   }
 
-    // ===== 6단계: 리뷰 크롤링 요청 =====
-  // 크롤링 기능이 제거되었습니다.
-  // 새로운 기능으로 대체 예정
-
-  // ===== 7단계: AI 분석 =====
+    // ===== 6단계: AI 분석 =====
   async analyzeReviews(req, res) {
     try {
       const { reviewId } = req.body;
@@ -459,9 +452,9 @@ class StoresController {
         });
       }
 
-      console.log(`[INFO] 7단계 - AI 분석 시작: 리뷰 ID ${reviewId}`);
+      console.log(`[INFO] 6단계 - AI 분석 시작: 리뷰 ID ${reviewId}`);
       
-      // 크롤링된 리뷰 조회
+      // 리뷰 조회
       const { data: review, error: reviewError } = await supabase
         .from('reviews')
         .select('*')
@@ -509,7 +502,7 @@ class StoresController {
         });
       }
 
-      console.log(`[INFO] 7단계 - AI 분석 완료: 분석 ID ${savedAnalysis.id}`);
+      console.log(`[INFO] 6단계 - AI 분석 완료: 분석 ID ${savedAnalysis.id}`);
 
       return res.json({
         success: true,
@@ -596,12 +589,6 @@ class StoresController {
       
       console.log(`[STEP 5] 매장 저장 완료: ID ${saveResult.data.storeId}`);
       
-      // 6단계: 리뷰 크롤링 (제거됨)
-      console.log(`[STEP 6] 리뷰 크롤링 기능이 제거되었습니다.`);
-      
-      // 7단계: AI 분석 (크롤링 없이 진행 불가)
-      console.log(`[STEP 7] AI 분석을 위한 리뷰 데이터가 없습니다.`);
-      
       console.log(`[INFO] 매장 저장까지 완료: 매장 ID ${saveResult.data.storeId}`);
       
       return res.json({
@@ -614,9 +601,9 @@ class StoresController {
             selectedStoreIndex: selectedStoreIndex
           },
           storeId: saveResult.data.storeId,
-          message: '매장 저장이 완료되었습니다. 리뷰 크롤링 기능은 제거되었습니다.'
+          message: '매장 저장이 완료되었습니다.'
         },
-        message: '매장 저장이 완료되었습니다. 리뷰 크롤링 기능은 제거되었습니다.'
+        message: '매장 저장이 완료되었습니다.'
       });
 
     } catch (error) {
@@ -704,9 +691,6 @@ class StoresController {
       data: { storeId: data.id, store: data }
     };
   }
-
-  // crawlReviewsInternal 메서드가 제거되었습니다.
-  // 크롤링 기능을 새로운 기능으로 대체 예정
 
   async analyzeReviewsInternal(reviewId) {
     const { data: review, error: reviewError } = await supabase

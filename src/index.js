@@ -5,11 +5,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 환경설정
-require('./config');
-
 // 기본 미들웨어 설정
-app.use(logger); // 요청 로깅
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -18,42 +14,39 @@ app.use(cors());
 const routes = require('./routes');
 app.use('/api', routes);
 
+const storesRoutes = require('./routes/stores');
 const adsRoutes = require('./routes/ads');
 const salesRoutes = require('./routes/sales');
 const reviewsRoutes = require('./routes/reviews');
-const authRoutes = require('./routes/auth'); // auth 라우트 추가
 
-// 인증 미들웨어는 예시로 /api/sales에만 적용
+// 분리된 인증 라우터 사용
+const naverAuthRoutes = require('./routes/naverAuth');
+const kakaoAuthRoutes = require('./routes/kakaoAuth');
+
+// 기존 auth 라우터 (하위 호환성을 위해 유지)
+const authRoutes = require('./routes/auth');
+
+// 라우터 연결
+app.use('/api/stores', storesRoutes);
 app.use('/api/ads', adsRoutes);
-app.use('/api/sales', auth, salesRoutes);
+app.use('/api/sales', salesRoutes);
 app.use('/api/reviews', reviewsRoutes);
-app.use('/api/auth', authRoutes); // auth 라우트 연결
+
+// 분리된 인증 라우터 연결
+app.use('/api/auth/naver', naverAuthRoutes);  // 네이버 인증: /api/auth/naver/*
+app.use('/api/auth/kakao', kakaoAuthRoutes);  // 카카오 인증: /api/auth/kakao/*
+
+// 기존 auth 라우터 (하위 호환성)
+app.use('/api/auth', authRoutes);
 
 // 헬스 체크 라우트
 app.get('/', (req, res) => {
   res.send('MyBiz 백엔드 서버가 정상적으로 동작 중입니다!');
 });
 
-// Swagger API 문서화 설정
+// Swagger API 문서화 설정 - config 파일 사용
 const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
-
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'MyBiz API',
-      version: '1.0.0',
-      description: 'MyBiz 소상공인 AI 백엔드 API 문서'
-    },
-    servers: [
-      { url: 'http://localhost:' + PORT }
-    ]
-  },
-  apis: ['./routes/*.js'],
-};
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
+const swaggerSpec = require('./config/swagger');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // 공통 에러 처리 미들웨어
@@ -66,4 +59,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`MyBiz 백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+  console.log(`Swagger 문서: http://localhost:${PORT}/api-docs`);
+  console.log(`네이버 인증: /api/auth/naver/*`);
+  console.log(`카카오 인증: /api/auth/kakao/*`);
 });

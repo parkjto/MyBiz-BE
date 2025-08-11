@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Stores
- *   description: 매장 검색 및 Place ID 추출 관련 API (7단계 플로우)
+ *   description: 매장 검색 및 Place ID 추출 관련 API (6단계 플로우)
  */
 
 const express = require('express');
@@ -445,92 +445,13 @@ router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStat
  */
 router.post('/save', storesController.saveStore.bind(storesController));
 
-// ===== 6단계: 리뷰 크롤링 요청 =====
-/**
- * @swagger
- * /api/stores/crawl-reviews:
- *   post:
- *     summary: 6단계 - 리뷰 크롤링 요청
- *     description: 저장된 매장의 Place ID를 이용해 리뷰를 크롤링합니다.
- *     tags: [Stores]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - storeId
- *             properties:
- *               storeId:
- *                 type: integer
- *                 description: 저장된 매장 ID
- *                 example: 1
- *               level:
- *                 type: string
- *                 enum: [basic, intermediate, advanced]
- *                 default: basic
- *                 description: 크롤링 레벨
- *                 example: basic
- *     responses:
- *       200:
- *         description: 리뷰 크롤링 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     reviewId:
- *                       type: integer
- *                       example: 1
- *                     storeId:
- *                       type: integer
- *                       example: 1
- *                     placeId:
- *                       type: string
- *                       example: "1234567890"
- *                     level:
- *                       type: string
- *                       example: "basic"
- *                     reviews:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           author:
- *                             type: string
- *                             example: "사용자1"
- *                           content:
- *                             type: string
- *                             example: "맛있고 친절해요!"
- *                           visitDate:
- *                             type: string
- *                             example: "2024년 1월 15일"
- *                     totalCount:
- *                       type: integer
- *                       example: 10
- *                     crawledAt:
- *                       type: string
- *                       example: "2024-01-15T22:30:00.000Z"
- *                 message:
- *                   type: string
- *                   example: "10개의 리뷰를 성공적으로 크롤링했습니다."
- */
-router.post('/crawl-reviews', storesController.crawlReviews.bind(storesController));
-
-// ===== 7단계: AI 분석 =====
+// ===== 6단계: AI 분석 =====
 /**
  * @swagger
  * /api/stores/analyze-reviews:
  *   post:
- *     summary: 7단계 - AI 분석
- *     description: 크롤링된 리뷰를 AI로 분석하여 감성 분석, 키워드 추출 등을 수행합니다.
+ *     summary: 6단계 - AI 분석
+ *     description: 수집된 리뷰를 AI로 분석하여 감성 분석, 키워드 추출 등을 수행합니다.
  *     tags: [Stores]
  *     requestBody:
  *       required: true
@@ -543,7 +464,7 @@ router.post('/crawl-reviews', storesController.crawlReviews.bind(storesControlle
  *             properties:
  *               reviewId:
  *                 type: integer
- *                 description: 크롤링된 리뷰 ID
+ *                 description: 리뷰 ID
  *                 example: 1
  *     responses:
  *       200:
@@ -610,8 +531,8 @@ router.post('/analyze-reviews', storesController.analyzeReviews.bind(storesContr
  * @swagger
  * /api/stores/full-flow:
  *   post:
- *     summary: 전체 플로우 실행 (1-7단계 통합)
- *     description: 1단계부터 7단계까지의 전체 플로우를 한 번에 실행합니다.
+ *     summary: 전체 플로우 실행 (1-6단계 통합)
+ *     description: 1단계부터 6단계까지의 전체 플로우를 한 번에 실행합니다.
  *     tags: [Stores]
  *     requestBody:
  *       required: true
@@ -631,12 +552,7 @@ router.post('/analyze-reviews', storesController.analyzeReviews.bind(storesContr
  *                 type: integer
  *                 description: 사용자가 선택한 매장 인덱스 (0부터 시작)
  *                 example: 0
- *               level:
- *                 type: string
- *                 enum: [basic, intermediate, advanced]
- *                 default: basic
- *                 description: 리뷰 크롤링 레벨
- *                 example: basic
+ *               
  *     responses:
  *       200:
  *         description: 전체 플로우 실행 성공
