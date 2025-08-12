@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const naverAuthController = require('../controllers/naverAuthController');
+const authMiddleware = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -62,5 +63,11 @@ router.get('/naverlogin', naverAuthController.naverLogin);
 
 // 네이버 OAuth 콜백 처리
 router.get('/callback', naverAuthController.naverLoginCallback);
+
+// 네이버 사용자 프로필 조회 (인증 필요)
+router.get('/profile', authMiddleware.verifyToken, naverAuthController.getProfile);
+
+// 네이버 로그아웃
+router.post('/logout', naverAuthController.logout);
 
 module.exports = router;

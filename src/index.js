@@ -18,6 +18,10 @@ const storesRoutes = require('./routes/stores');
 const adsRoutes = require('./routes/ads');
 const salesRoutes = require('./routes/sales');
 const reviewsRoutes = require('./routes/reviews');
+const ocrRoutes = require('./routes/ocr');
+
+// 이미지 업로드 라우터
+const imageUploadRoutes = require('./routes/imageUpload');
 
 // 분리된 인증 라우터 사용
 const naverAuthRoutes = require('./routes/naverAuth');
@@ -31,6 +35,10 @@ app.use('/api/stores', storesRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/ocr', ocrRoutes);
+
+// 이미지 업로드 라우터 연결
+app.use('/api/upload', imageUploadRoutes);
 
 // 분리된 인증 라우터 연결
 app.use('/api/auth/naver', naverAuthRoutes);  // 네이버 인증: /api/auth/naver/*
@@ -48,6 +56,10 @@ app.get('/', (req, res) => {
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// 이미지 업로드 에러 처리 미들웨어
+const uploadErrorHandler = require('./middlewares/uploadErrorMiddleware');
+app.use('/api/upload', uploadErrorHandler);
 
 // 공통 에러 처리 미들웨어
 app.use((err, req, res, next) => {

@@ -1,3 +1,12 @@
 .env
 node_modules/
-
+google-credentials/
+uploads/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+test-*.txt
+.cursor/
+package-lock.json

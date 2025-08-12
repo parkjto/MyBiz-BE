@@ -121,25 +121,41 @@ exports.getProfile = async (req, res) => {
 };
 
 // 로그아웃
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
   try {
-    const result = authService.logout();
+    const authHeader = req.headers.authorization;
+    let token = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
+    if (token) {
+      // 간단한 토큰 매니저를 사용하여 토큰을 블랙리스트에 추가
+      const loginTokenManager = require('../utils/loginTokenManager');
+      loginTokenManager.addToBlacklist(token);
+    }
+    
     res.json({
       success: true,
-      ...result
+      message: '로그아웃 성공',
+      instructions: {
+        step1: '클라이언트에서 저장된 JWT 토큰을 제거하세요',
+        step2: 'Authorization 헤더에서 Bearer 토큰을 제거하세요',
+        step3: '로그인 페이지로 리다이렉트하세요'
+      }
     });
   } catch (err) {
     console.error('로그아웃 에러:', err);
-    res.status(500).json({ 
-      success: false,
-      error: '로그아웃 처리 중 오류가 발생했습니다.' 
-    });
+    res.status(500).json({ success: false, error: '로그아웃 처리 중 오류가 발생했습니다.' });
   }
 };
 
 // 테스트용 환경 확인
 exports.testEnvironment = (req, res) => {
   try {
+    const loginTokenManager = require('../utils/loginTokenManager');
+    
     const env = {
       NODE_ENV: process.env.NODE_ENV,
       PORT: process.env.PORT,
@@ -156,6 +172,7 @@ exports.testEnvironment = (req, res) => {
       success: true,
       message: '환경 설정 확인 완료',
       environment: env,
+      tokenManager: loginTokenManager.getBlacklistStatus(),
       timestamp: new Date().toISOString()
     });
   } catch (err) {
