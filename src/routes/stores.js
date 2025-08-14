@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Stores
- *   description: 매장 검색 및 Place ID 추출 관련 API (6단계 플로우)
+ *   description: 매장 검색 관련 API (Place ID 기능 비활성화됨)
  */
 
 const express = require('express');
@@ -194,174 +194,11 @@ router.post('/search', storesController.searchStores.bind(storesController));
  */
 router.post('/select', storesController.selectStore.bind(storesController));
 
-// ===== 3단계: Place ID 추출 (다단계 시도) =====
-/**
- * @swagger
- * /api/stores/extract-place-id:
- *   post:
- *     summary: 3단계 - Place ID 추출 (다단계 시도)
- *     description: 선택된 매장의 Place ID를 여러 방법으로 추출합니다. 2-1 스크래핑, 2-2 allSearch API, 2-3 수동 확인
- *     tags: [Stores]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - storeData
- *             properties:
- *               storeData:
- *                 type: object
- *                 properties:
- *                   title:
- *                     type: string
- *                     example: "칼포니치킨"
- *                   address:
- *                     type: string
- *                     example: "서울특별시 양천구 신월동 1002-4"
- *                   roadAddress:
- *                     type: string
- *                     example: "서울특별시 양천구 신월로 128"
- *                   category:
- *                     type: string
- *                     example: "음식점>치킨"
- *                   mapx:
- *                     type: string
- *                     example: "1268381536"
- *                   mapy:
- *                     type: string
- *                     example: "375164998"
- *     responses:
- *       200:
- *         description: Place ID 추출 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     placeId:
- *                       type: string
- *                       example: "1234567890"
- *                     placeUrl:
- *                       type: string
- *                       example: "https://m.place.naver.com/place/1234567890/home"
- *                     reviewUrl:
- *                       type: string
- *                       example: "https://m.place.naver.com/place/1234567890/review"
- *                     extractionMethod:
- *                       type: string
- *                       example: "scraping"
- *                     extractionSteps:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           step:
- *                             type: string
- *                             example: "2-1"
- *                           method:
- *                             type: string
- *                             example: "스크래핑"
- *                           success:
- *                             type: boolean
- *                             example: true
- *                           placeId:
- *                             type: string
- *                             example: "1234567890"
- *                     successRate:
- *                       type: number
- *                       example: 0.85
- *                     confidence:
- *                       type: number
- *                       example: 0.85
- *                     extractedAt:
- *                       type: string
- *                       example: "2024-01-15T22:30:00.000Z"
- *                 message:
- *                   type: string
- *                   example: "Place ID를 성공적으로 추출했습니다: 1234567890 (스크래핑 방식)"
- */
-router.post('/extract-place-id', storesController.extractPlaceId.bind(storesController));
+// ===== 3단계: Place ID 추출 (비활성화) =====
+// router.post('/extract-place-id', storesController.extractPlaceId.bind(storesController)); // [DISABLED]
 
-// ===== 4단계: Place ID 추출 상태 확인 =====
-/**
- * @swagger
- * /api/stores/extract-place-id/status:
- *   get:
- *     summary: 4단계 - Place ID 추출 상태 확인
- *     description: 각 추출 방법별 성공률과 시스템 상태를 확인합니다.
- *     tags: [Stores]
- *     responses:
- *       200:
- *         description: 상태 확인 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     methods:
- *                       type: object
- *                       properties:
- *                         "2-1":
- *                           type: object
- *                           properties:
- *                             name:
- *                               type: string
- *                               example: "스크래핑"
- *                             successRate:
- *                               type: number
- *                               example: 0.85
- *                             description:
- *                               type: string
- *                               example: "네이버 검색 스크래핑"
- *                         "2-2":
- *                           type: object
- *                           properties:
- *                             name:
- *                               type: string
- *                               example: "allSearch API"
- *                             successRate:
- *                               type: number
- *                               example: 0.4
- *                             description:
- *                               type: string
- *                               example: "네이버 지도 allSearch API"
- *                         "2-3":
- *                           type: object
- *                           properties:
- *                             name:
- *                               type: string
- *                               example: "수동 확인"
- *                             successRate:
- *                               type: number
- *                               example: 1.0
- *                             description:
- *                               type: string
- *                               example: "수동 확인 안내"
- *                     overallSuccessRate:
- *                       type: number
- *                       example: 0.85
- *                     lastUpdated:
- *                       type: string
- *                       example: "2024-01-15T22:30:00.000Z"
- *                 message:
- *                   type: string
- *                   example: "Place ID 추출 시스템 상태 확인 완료"
- */
-router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStatus.bind(storesController));
+// ===== 4단계: Place ID 추출 상태 확인 (비활성화) =====
+// router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStatus.bind(storesController)); // [DISABLED]
 
 // ===== 5단계: 매장 정보 저장 =====
 /**
@@ -369,7 +206,7 @@ router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStat
  * /api/stores/save:
  *   post:
  *     summary: 5단계 - 매장 정보 저장
- *     description: Place ID가 추출된 매장 정보를 데이터베이스에 저장합니다.
+ *     description: Place ID 기능 비활성화로 placeId/placeUrl/reviewUrl은 null로 저장됩니다.
  *     tags: [Stores]
  *     requestBody:
  *       required: true
@@ -400,13 +237,16 @@ router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStat
  *                     example: "음식점>치킨"
  *                   placeId:
  *                     type: string
- *                     example: "1234567890"
+ *                     nullable: true
+ *                     example: null
  *                   placeUrl:
  *                     type: string
- *                     example: "https://m.place.naver.com/place/1234567890/home"
+ *                     nullable: true
+ *                     example: null
  *                   reviewUrl:
  *                     type: string
- *                     example: "https://m.place.naver.com/place/1234567890/review"
+ *                     nullable: true
+ *                     example: null
  *     responses:
  *       200:
  *         description: 매장 저장 성공
@@ -435,7 +275,8 @@ router.get('/extract-place-id/status', storesController.getPlaceIdExtractionStat
  *                           example: "칼포니치킨"
  *                         place_id:
  *                           type: string
- *                           example: "1234567890"
+ *                           nullable: true
+ *                           example: null
  *                     savedAt:
  *                       type: string
  *                       example: "2024-01-15T22:30:00.000Z"
@@ -584,7 +425,8 @@ router.post('/analyze-reviews', storesController.analyzeReviews.bind(storesContr
  *                               example: "칼포니치킨"
  *                             placeId:
  *                               type: string
- *                               example: "1234567890"
+ *                               nullable: true
+ *                               example: null
  *                     storeId:
  *                       type: integer
  *                       example: 1

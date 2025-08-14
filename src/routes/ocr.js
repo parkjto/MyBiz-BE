@@ -10,6 +10,9 @@ router.post('/reviews', uploadOcrImages, (req, res, next) => ocrController.proce
 // GET /api/ocr/reviews/:id (optional: stub)
 router.get('/reviews/:id', (req, res) => ocrController.getResultById(req, res));
 
+// GET /api/ocr/config - OCR 설정 조회
+router.get('/config', (req, res, next) => ocrController.getConfig(req, res, next));
+
 module.exports = router;
 
 

@@ -142,49 +142,12 @@ class NaverLocalService {
    * @returns {Promise<Object>} Place ID 추출 결과
    */
   async extractPlaceId(storeInfo) {
-    console.log(`🔍 ${storeInfo.name} Place ID 추출 시작...`);
-    
-    const methods = [
-      { name: 'allsearch', func: this.tryAllSearchAPI.bind(this) }
-    ];
-    
-    for (let i = 0; i < methods.length; i++) {
-      const method = methods[i];
-      console.log(`🔄 방법 ${i + 1} (${method.name}) 시도 중...`);
-      
-      try {
-        const result = await method.func(storeInfo);
-        
-        if (result && result.placeId) {
-          console.log(`✅ 방법 ${i + 1} (${method.name}) 성공: ${result.placeId}`);
-          
-          return {
-            ...result,
-            extractionMethod: method.name,
-            successRate: this.successRates[method.name] || 0.5,
-            extractedAt: new Date().toISOString()
-          };
-        }
-        
-      } catch (error) {
-        console.log(`❌ 방법 ${i + 1} (${method.name}) 실패: ${error.message}`);
-      }
-      
-      // 정책 준수: 메서드 간 대기 (축소)
-      await this.delay(500);
-    }
-    
-    // 모든 자동 방법 실패 시 수동 안내
+    // [DISABLED] Place ID 추출 기능 비활성화 (항상 비활성 스텁 반환)
     return {
       placeId: null,
-      manualSteps: [
-        '1. https://map.naver.com 접속',
-        `2. "${storeInfo.name} ${storeInfo.district || ''}" 검색`,
-        '3. 매장 클릭 후 URL에서 /place/숫자 확인',
-        '4. 해당 숫자가 Place ID입니다'
-      ],
-      method: 'manual',
-      successRate: 1.0,
+      manualSteps: [],
+      method: 'disabled',
+      successRate: 0,
       extractedAt: new Date().toISOString()
     };
   }
@@ -374,31 +337,15 @@ class NaverLocalService {
       const selectedStore = stores[selectedIndex] || stores[0];
       console.log(`📍 선택된 매장: ${selectedStore.title} (${selectedStore.address})`);
 
-      // 2단계: 선택된 매장의 좌표로 Place ID 추출
+      // 2단계: Place ID 추출 비활성화에 따라 좌표 기반 정보만 설정
       if (selectedStore.mapx && selectedStore.mapy) {
-        console.log('🔍 allSearch API로 Place ID 추출 시도...');
-        
-        const placeIdResult = await this.extractPlaceId(
-          selectedStore
+        selectedStore.coordinateId = `${selectedStore.mapx}_${selectedStore.mapy}`;
+        selectedStore.mapUrl = this.createMapUrlByCoordinates(
+          selectedStore.mapx,
+          selectedStore.mapy,
+          selectedStore.title
         );
-        
-        if (placeIdResult.placeId) {
-          // Place ID 추출 성공
-          selectedStore.placeId = placeIdResult.placeId;
-          selectedStore.mapUrl = placeIdResult.placeUrl;
-          selectedStore.extractedAt = placeIdResult.extractedAt;
-          console.log(`✅ Place ID 추출 성공: ${selectedStore.placeId}`);
-        } else {
-          // Place ID 추출 실패 시 좌표 기반 임시 ID 생성
-          selectedStore.coordinateId = `${selectedStore.mapx}_${selectedStore.mapy}`;
-          selectedStore.mapUrl = this.createMapUrlByCoordinates(
-            selectedStore.mapx,
-            selectedStore.mapy,
-            selectedStore.title
-          );
-          selectedStore.extractedAt = new Date().toISOString();
-          console.log(`⚠️ 좌표 기반 임시 ID 생성: ${selectedStore.coordinateId}`);
-        }
+        selectedStore.extractedAt = new Date().toISOString();
       }
 
       return {

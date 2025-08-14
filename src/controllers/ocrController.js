@@ -2,6 +2,7 @@ const ocrService = require('../services/ocrService');
 const sentimentService = require('../services/sentimentService');
 const gptService = require('../services/gptService');
 const { createOcrResult, getOcrResultById } = require('../models/ocrResult');
+const { scheduleCleanupForUploadedFiles } = require('../middlewares/ocrUploadMiddleware');
 
 class OcrController {
   /**
@@ -18,7 +19,11 @@ class OcrController {
       }
 
       const filePaths = req.files.map((f) => f.path);
-      const text = await ocrService.extractMergedText(filePaths);
+      const ocrResult = await ocrService.extractMergedText(filePaths);
+      
+      // 구조화된 데이터에서 텍스트 추출
+      const { text, structured } = ocrResult;
+      
       const sentiment = await sentimentService.analyze(text);
       const { summary, keywords } = await gptService.summarize(text);
 
@@ -31,9 +36,13 @@ class OcrController {
         summary,
       });
 
+      // OCR 처리 완료 후 이미지 자동 삭제 스케줄링 (1시간 후)
+      scheduleCleanupForUploadedFiles(req.files);
+
       res.status(200).json({ 
         id: saved.id, 
         text, 
+        structured, // 구조화된 데이터 추가
         sentiment, 
         keywords, 
         summary,
@@ -67,6 +76,22 @@ class OcrController {
       });
     } catch (err) {
       return next(err);
+    }
+  }
+
+  /**
+   * GET /api/ocr/config
+   * 현재 OCR 설정 조회 (디버깅용)
+   */
+  async getConfig(req, res, next) {
+    try {
+      const config = ocrService.getConfig();
+      res.status(200).json({
+        message: 'OCR 설정 조회 성공',
+        config
+      });
+    } catch (error) {
+      return next(error);
     }
   }
 }

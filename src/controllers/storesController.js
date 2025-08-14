@@ -4,7 +4,7 @@
  */
 
 const NaverLocalService = require('../services/naverLocalService');
-const PlaceIdExtractionService = require('../services/placeIdExtractionService');
+// const PlaceIdExtractionService = require('../services/placeIdExtractionService'); // [DISABLED] Place ID 추출 비활성화
 const supabase = require('../utils/supabaseClient');
 
 class StoresController {
@@ -12,13 +12,13 @@ class StoresController {
     console.log('[DEBUG] StoresController constructor 시작');
     
     this.naverLocalService = new NaverLocalService();
-    this.placeIdService = new PlaceIdExtractionService();
+    // this.placeIdService = new PlaceIdExtractionService(); // [DISABLED]
     
     // 메서드들을 this에 바인딩
     this.searchStores = this.searchStores.bind(this);
     this.selectStore = this.selectStore.bind(this);
-    this.extractPlaceId = this.extractPlaceId.bind(this);
-    this.getPlaceIdExtractionStatus = this.getPlaceIdExtractionStatus.bind(this);
+    // this.extractPlaceId = this.extractPlaceId.bind(this); // [DISABLED]
+    // this.getPlaceIdExtractionStatus = this.getPlaceIdExtractionStatus.bind(this); // [DISABLED]
     this.saveStore = this.saveStore.bind(this);
     this.analyzeReviews = this.analyzeReviews.bind(this);
     this.executeFullFlow = this.executeFullFlow.bind(this);
@@ -184,188 +184,11 @@ class StoresController {
     }
   }
 
-  // ===== 3단계: Place ID 추출 (다단계 시도) =====
-  async extractPlaceId(req, res) {
-    try {
-      const { storeData } = req.body;
-      
-      if (!storeData || !storeData.title) {
-        return res.status(400).json({
-          success: false,
-          message: '매장 정보가 필요합니다.'
-        });
-      }
+  // ===== 3단계: Place ID 추출 (비활성화) =====
+  // async extractPlaceId(req, res) { /* [DISABLED] */ }
 
-      console.log(`[INFO] 3단계 - Place ID 추출 시작: "${storeData.title}"`);
-      
-      // 다단계 Place ID 추출 시도
-      const extractionSteps = [];
-      
-      // 2-1단계: 스크래핑 방식
-      try {
-        console.log('[STEP 2-1] 스크래핑 방식 시도...');
-        const scrapingResult = await this.placeIdService.trySearchScraping(storeData);
-        if (scrapingResult && scrapingResult.placeId) {
-          extractionSteps.push({
-            step: '2-1',
-            method: '스크래핑',
-            success: true,
-            placeId: scrapingResult.placeId
-          });
-          
-          return res.json({
-            success: true,
-            data: {
-              placeId: scrapingResult.placeId,
-              placeUrl: scrapingResult.placeUrl,
-              reviewUrl: scrapingResult.reviewUrl,
-              extractionMethod: 'scraping',
-              extractionSteps: extractionSteps,
-              successRate: 0.85,
-              confidence: 0.85,
-              extractedAt: new Date().toISOString()
-            },
-            message: `Place ID를 성공적으로 추출했습니다: ${scrapingResult.placeId} (스크래핑 방식)`
-          });
-        } else {
-          extractionSteps.push({
-            step: '2-1',
-            method: '스크래핑',
-            success: false,
-            error: '스크래핑 실패'
-          });
-        }
-      } catch (error) {
-        extractionSteps.push({
-          step: '2-1',
-          method: '스크래핑',
-          success: false,
-          error: error.message
-        });
-      }
-
-      // 2-2단계: allSearch API 방식
-      try {
-        console.log('[STEP 2-2] allSearch API 방식 시도...');
-        const allSearchResult = await this.placeIdService.tryAllSearchAPI(storeData);
-        if (allSearchResult && allSearchResult.placeId) {
-          extractionSteps.push({
-            step: '2-2',
-            method: 'allSearch API',
-            success: true,
-            placeId: allSearchResult.placeId
-          });
-          
-          return res.json({
-            success: true,
-            data: {
-              placeId: allSearchResult.placeId,
-              placeUrl: allSearchResult.placeUrl,
-              reviewUrl: allSearchResult.reviewUrl,
-              extractionMethod: 'allsearch',
-              extractionSteps: extractionSteps,
-              successRate: 0.4,
-              confidence: 0.4,
-              extractedAt: new Date().toISOString()
-            },
-            message: `Place ID를 성공적으로 추출했습니다: ${allSearchResult.placeId} (allSearch API 방식)`
-          });
-        } else {
-          extractionSteps.push({
-            step: '2-2',
-            method: 'allSearch API',
-            success: false,
-            error: 'allSearch API 실패'
-          });
-        }
-      } catch (error) {
-        extractionSteps.push({
-          step: '2-2',
-          method: 'allSearch API',
-          success: false,
-          error: error.message
-        });
-      }
-
-      // 2-3단계: 수동 확인 안내
-      extractionSteps.push({
-        step: '2-3',
-        method: '수동 확인',
-        success: false,
-        manualSteps: [
-          '1. https://map.naver.com 접속',
-          `2. "${storeData.title} ${storeData.address || ''}" 검색`,
-          '3. 검색 결과에서 해당 매장 클릭',
-          '4. URL에서 /place/숫자 부분 확인'
-        ]
-      });
-
-      return res.status(404).json({
-        success: false,
-        data: {
-          extractionSteps: extractionSteps,
-          manualSteps: [
-            '1. https://map.naver.com 접속',
-            `2. "${storeData.title} ${storeData.address || ''}" 검색`,
-            '3. 검색 결과에서 해당 매장 클릭',
-            '4. URL에서 /place/숫자 부분 확인'
-          ],
-          method: 'manual',
-          successRate: 1.0
-        },
-        message: '자동 추출에 실패했습니다. 수동으로 확인해주세요.'
-      });
-
-    } catch (error) {
-      console.error('[ERROR] Place ID 추출 실패:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Place ID 추출 중 오류가 발생했습니다.',
-        error: error.message
-      });
-    }
-  }
-
-  // ===== 4단계: Place ID 추출 상태 확인 =====
-  async getPlaceIdExtractionStatus(req, res) {
-    try {
-      const status = this.placeIdService.getSystemStatus();
-      
-      return res.json({
-        success: true,
-        data: {
-          methods: {
-            "2-1": {
-              name: status.methods["2-1"].name,
-              successRate: status.methods["2-1"].successRate,
-              description: status.methods["2-1"].description
-            },
-            "2-2": {
-              name: status.methods["2-2"].name,
-              successRate: status.methods["2-2"].successRate,
-              description: status.methods["2-2"].description
-            },
-            "2-3": {
-              name: status.methods["2-3"].name,
-              successRate: status.methods["2-3"].successRate,
-              description: status.methods["2-3"].description
-            }
-          },
-          overallSuccessRate: status.overallSuccessRate,
-          lastUpdated: status.lastUpdated
-        },
-        message: 'Place ID 추출 시스템 상태 확인 완료'
-      });
-
-    } catch (error) {
-      console.error('[ERROR] 상태 확인 실패:', error);
-      return res.status(500).json({
-        success: false,
-        message: '상태 확인 중 오류가 발생했습니다.',
-        error: error.message
-      });
-    }
-  }
+  // ===== 4단계: Place ID 추출 상태 확인 (비활성화) =====
+  // async getPlaceIdExtractionStatus(req, res) { /* [DISABLED] */ }
 
   // ===== 5단계: 매장 정보 저장 =====
   async saveStore(req, res) {
@@ -566,22 +389,16 @@ class StoresController {
       // 2단계: 매장 선택 (세션에 저장)
       console.log(`[STEP 2] 매장 선택 완료: ${selectedStore.title}`);
       
-      // 3단계: Place ID 추출
-      console.log(`[STEP 3] Place ID 추출 시작...`);
-      const placeIdResult = await this.extractPlaceIdInternal(selectedStore);
-      if (!placeIdResult.success) {
-        return res.status(500).json(placeIdResult);
-      }
-      
-      console.log(`[STEP 3] Place ID 추출 완료: ${placeIdResult.data.placeId}`);
-      
+      // 3단계: Place ID 추출 단계 비활성화됨
+      const placeIdResult = { success: true, data: { placeId: null, placeUrl: null, reviewUrl: null } };
+
       // 5단계: 매장 저장
       console.log(`[STEP 5] 매장 저장 시작...`);
       const saveResult = await this.saveStoreInternal({
         ...selectedStore,
-        placeId: placeIdResult.data.placeId,
-        placeUrl: placeIdResult.data.placeUrl,
-        reviewUrl: placeIdResult.data.reviewUrl
+        placeId: null,
+        placeUrl: null,
+        reviewUrl: null
       });
       if (!saveResult.success) {
         return res.status(500).json(saveResult);
@@ -634,27 +451,8 @@ class StoresController {
   }
 
   async extractPlaceIdInternal(storeData) {
-    const result = await this.placeIdService.extractPlaceId({
-      name: storeData.title,
-      address: storeData.address,
-      district: storeData.category
-    });
-    
-    if (result.placeId) {
-      return {
-        success: true,
-        data: {
-          placeId: result.placeId,
-          placeUrl: result.placeUrl,
-          reviewUrl: result.reviewUrl
-        }
-      };
-    } else {
-      return {
-        success: false,
-        error: 'Place ID 추출에 실패했습니다.'
-      };
-    }
+    // [DISABLED] Place ID 추출 내부 로직 비활성화
+    return { success: true, data: { placeId: null, placeUrl: null, reviewUrl: null } };
   }
 
   async saveStoreInternal(storeData) {

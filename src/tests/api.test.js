@@ -1,6 +1,6 @@
 const request = require('supertest');
 const express = require('express');
-const app = require('../index');
+const app = require('./setup');
 
 describe('API 엔드포인트 테스트', () => {
   it('/api/ads GET 광고 자동 생성', async () => {

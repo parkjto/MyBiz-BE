@@ -40,6 +40,19 @@ exports.verifyToken = (token) => {
 exports.kakaoLogin = async (code) => {
   if (!code) throw new Error('카카오 인가 코드가 필요합니다.');
 
+  // 환경 변수 검증 강화
+  if (!KAKAO_CLIENT_ID) {
+    throw new Error('카카오 클라이언트 ID가 설정되지 않았습니다.');
+  }
+  
+  if (!KAKAO_REDIRECT_URI) {
+    throw new Error('카카오 리다이렉트 URI가 설정되지 않았습니다.');
+  }
+  
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    throw new Error('Supabase 설정이 완료되지 않았습니다.');
+  }
+
   // 환경 변수 확인
   console.log('환경 변수 확인:', {
     KAKAO_CLIENT_ID: KAKAO_CLIENT_ID ? '설정됨' : '설정되지 않음',

@@ -20,9 +20,6 @@ const salesRoutes = require('./routes/sales');
 const reviewsRoutes = require('./routes/reviews');
 const ocrRoutes = require('./routes/ocr');
 
-// 이미지 업로드 라우터
-const imageUploadRoutes = require('./routes/imageUpload');
-
 // 분리된 인증 라우터 사용
 const naverAuthRoutes = require('./routes/naverAuth');
 const kakaoAuthRoutes = require('./routes/kakaoAuth');
@@ -36,9 +33,6 @@ app.use('/api/ads', adsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/ocr', ocrRoutes);
-
-// 이미지 업로드 라우터 연결
-app.use('/api/upload', imageUploadRoutes);
 
 // 분리된 인증 라우터 연결
 app.use('/api/auth/naver', naverAuthRoutes);  // 네이버 인증: /api/auth/naver/*
@@ -57,10 +51,6 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// 이미지 업로드 에러 처리 미들웨어
-const uploadErrorHandler = require('./middlewares/uploadErrorMiddleware');
-app.use('/api/upload', uploadErrorHandler);
-
 // 공통 에러 처리 미들웨어
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -69,9 +59,15 @@ app.use((err, req, res, next) => {
 
 // ...추가 라우트 및 기능 구현 예정...
 
-app.listen(PORT, () => {
-  console.log(`MyBiz 백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
-  console.log(`Swagger 문서: http://localhost:${PORT}/api-docs`);
-  console.log(`네이버 인증: /api/auth/naver/*`);
-  console.log(`카카오 인증: /api/auth/kakao/*`);
-});
+// Express 앱을 export (테스트용)
+module.exports = app;
+
+// 서버 시작은 직접 실행 시에만
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`MyBiz 백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+    console.log(`Swagger 문서: http://localhost:${PORT}/api-docs`);
+    console.log(`네이버 인증: /api/auth/naver/*`);
+    console.log(`카카오 인증: /api/auth/kakao/*`);
+  });
+}
