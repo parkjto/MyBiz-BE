@@ -49,7 +49,7 @@ exports.kakaoLogin = async (code) => {
     throw new Error('카카오 리다이렉트 URI가 설정되지 않았습니다.');
   }
   
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
     throw new Error('Supabase 설정이 완료되지 않았습니다.');
   }
 
@@ -58,7 +58,7 @@ exports.kakaoLogin = async (code) => {
     KAKAO_CLIENT_ID: KAKAO_CLIENT_ID ? '설정됨' : '설정되지 않음',
     KAKAO_REDIRECT_URI: KAKAO_REDIRECT_URI || '설정되지 않음',
     SUPABASE_URL: process.env.SUPABASE_URL ? '설정됨' : '설정되지 않음',
-    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? '설정됨' : '설정되지 않음'
+    SUPABASE_KEY: process.env.SUPABASE_KEY ? '설정됨' : '설정되지 않음'
   });
 
   // 1. 인가 코드로 access_token 요청

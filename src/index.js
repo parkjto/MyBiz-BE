@@ -1,5 +1,5 @@
-require('dotenv').config();
-const testSupabase = require('./testSupabase');
+require('dotenv').config({ path: '../.env' });
+// const testSupabase = require('./testSupabase');
 const express = require('express');
 const cors = require('cors');
 const app = express();
