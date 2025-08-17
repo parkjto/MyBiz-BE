@@ -1,7 +1,7 @@
 // 광고 관련 라우트
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const adsController = require('../controllers/adsController');
+import adsController from '../controllers/adsController.js';
 
 /**
  * @swagger
@@ -23,4 +23,4 @@ const adsController = require('../controllers/adsController');
 
 router.get('/', adsController.getAds);
 
-module.exports = router;
+export default router;

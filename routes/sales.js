@@ -17,10 +17,10 @@
  */
 
 // 매출 관련 라우트
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const salesController = require('../controllers/salesController');
+import salesController from '../controllers/salesController.js';
 
 router.get('/', salesController.getSales);
 
-module.exports = router;
+export default router;

@@ -1,19 +1,24 @@
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 // 🎯 OCR 컨트롤러 import
-const {
+import {
   processReviewImages,
   getOcrResult,
   getOcrConfig,
   optimizeGrayText,
   testGrayTextOptimization,
   getOcrStatus
-} = require('../controllers/ocrController');
+} from '../controllers/ocrController.js';
+
+// 🎯 상수 설정 import 추가
+import { UPLOAD_CONFIG } from '../../config/constants.js';
+
+// 🎯 Express 라우터 생성
+const router = express.Router();
 
 // 🎯 Multer 설정 (파일 업로드)
 const storage = multer.diskStorage({
@@ -48,8 +53,8 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 20 * 1024 * 1024, // 🎯 20MB 제한
-    files: 10 // 🎯 최대 10개 파일
+    fileSize: UPLOAD_CONFIG.MAX_FILE_SIZE,
+    files: UPLOAD_CONFIG.MAX_FILES
   }
 });
 
@@ -58,7 +63,7 @@ const singleUpload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 20 * 1024 * 1024 // 🎯 20MB 제한
+    fileSize: UPLOAD_CONFIG.MAX_FILE_SIZE
   }
 });
 
@@ -67,7 +72,7 @@ const singleUpload = multer({
  * POST /api/ocr/reviews
  * 여러 이미지 파일을 받아서 OCR 처리
  */
-router.post('/reviews', upload.array('images', 10), async (req, res, next) => {
+router.post('/reviews', upload.array('images', UPLOAD_CONFIG.MAX_FILES), async (req, res, next) => {
   try {
     await processReviewImages(req, res);
   } catch (error) {
@@ -155,6 +160,6 @@ router.get('/test', (req, res) => {
   });
 });
 
-module.exports = router;
+export default router;
 
 

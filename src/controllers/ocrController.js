@@ -1,6 +1,6 @@
-const OcrService = require('../services/ocrService');
-const path = require('path');
-const fs = require('fs').promises;
+import OcrService from '../services/ocrService.js';
+import path from 'path';
+import fs from 'fs/promises';
 
 // 🎯 OCR 서비스 인스턴스 생성
 const ocrService = new OcrService();
@@ -36,6 +36,15 @@ const processReviewImages = async (req, res) => {
           success: true
         });
         
+        // 🎯 OCR 처리 완료 후 파일 자동 삭제 (모바일 앱 호환)
+        try {
+          await fs.unlink(file.path);
+          console.log(`🗑️ 파일 자동 삭제 완료: ${file.filename}`);
+        } catch (deleteError) {
+          console.error(`⚠️ 파일 자동 삭제 실패: ${file.filename}`, deleteError);
+          // 파일 삭제 실패해도 OCR 결과는 정상 반환
+        }
+        
         console.log(`✅ 파일 처리 완료: ${file.filename} (${text.length}자)`);
       } catch (error) {
         console.error(`❌ 파일 처리 실패: ${file.filename}`, error);
@@ -47,6 +56,14 @@ const processReviewImages = async (req, res) => {
           success: false,
           error: error.message
         });
+        
+        // 🎯 OCR 처리 실패 시에도 파일 자동 삭제 (모바일 앱 호환)
+        try {
+          await fs.unlink(file.path);
+          console.log(`🗑️ 실패 파일 자동 삭제 완료: ${file.filename}`);
+        } catch (deleteError) {
+          console.error(`⚠️ 실패 파일 자동 삭제 실패: ${file.filename}`, deleteError);
+        }
       }
     }
 
@@ -176,6 +193,14 @@ const testGrayTextOptimization = async (req, res) => {
     // 🎯 회색 글씨 최적화 OCR 실행
     const text = await ocrService.optimizeForGrayText(req.file.path);
     
+    // 🎯 회색 글씨 최적화 테스트 완료 후 파일 자동 삭제 (모바일 앱 호환)
+    try {
+      await fs.unlink(req.file.path);
+      console.log(`🗑️ 테스트 파일 자동 삭제 완료: ${req.file.filename}`);
+    } catch (deleteError) {
+      console.error(`⚠️ 테스트 파일 자동 삭제 실패: ${req.file.filename}`, deleteError);
+    }
+    
     res.json({
       success: true,
       message: '회색 글씨 최적화 테스트 완료',
@@ -226,7 +251,7 @@ const getOcrStatus = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   processReviewImages,
   getOcrResult,
   getOcrConfig,

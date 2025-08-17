@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const authController = require('../controllers/authController');
+import authController from '../controllers/authController.js';
 
 /**
  * @swagger
@@ -54,4 +54,4 @@ router.post('/kakao/login', authController.kakaoLogin);
 // 로그아웃 예시
 router.post('/logout', authController.logout);
 
-module.exports = router;
+export default router;

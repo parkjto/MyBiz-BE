@@ -1,25 +1,28 @@
-const sharp = require('sharp');
-const Tesseract = require('tesseract.js');
-const path = require('path');
-const fs = require('fs').promises;
-const pLimit = require('p-limit');
-const levenshtein = require('fast-levenshtein');
+import sharp from 'sharp';
+import Tesseract from 'tesseract.js';
+import path from 'path';
+import { promises as fs } from 'fs';
+import pLimit from 'p-limit';
+import levenshtein from 'fast-levenshtein';
+
+// 🎯 상수 설정 import 추가
+import { OCR_CONFIG } from '../../config/constants.js';
 
 class OcrService {
   constructor() {
     // 🎯 Tesseract.js 최적화 설정
     this.config = {
-      // 이미지 분할 설정
-      maxChunkHeight: parseInt(process.env.OCR_MAX_CHUNK_HEIGHT) || 1000,
-      overlap: parseInt(process.env.OCR_OVERLAP) || 200,
-      minLastChunk: parseInt(process.env.OCR_MIN_LAST_CHUNK) || 500,
-      maxChunks: parseInt(process.env.OCR_MAX_CHUNKS) || 100,
-      concurrency: parseInt(process.env.OCR_CONCURRENCY) || 3,
-      resizeWidth: parseInt(process.env.OCR_RESIZE_WIDTH) || 1200,
-      retries: parseInt(process.env.OCR_RETRIES) || 3,
-      
-      // 전처리 설정 (가이드 기반 최적화)
-      thresholdValue: parseInt(process.env.OCR_THRESHOLD_VALUE) || 128,
+          // 이미지 분할 설정
+    maxChunkHeight: OCR_CONFIG.MAX_CHUNK_HEIGHT,
+    overlap: parseInt(process.env.OCR_OVERLAP) || 200,
+    minLastChunk: parseInt(process.env.OCR_MIN_LAST_CHUNK) || 500,
+    maxChunks: parseInt(process.env.OCR_MAX_CHUNKS) || 100,
+    concurrency: parseInt(process.env.OCR_CONCURRENCY) || 3,
+    resizeWidth: OCR_CONFIG.RESIZE_WIDTH,
+    retries: parseInt(process.env.OCR_RETRIES) || 3,
+    
+    // 전처리 설정 (가이드 기반 최적화)
+    thresholdValue: OCR_CONFIG.THRESHOLD_VALUE,
       jpegQuality: parseInt(process.env.OCR_JPEG_QUALITY) || 90,
       contrastMultiplier: parseFloat(process.env.OCR_CONTRAST_MULTIPLIER) || 1.8,
       brightnessOffset: parseFloat(process.env.OCR_BRIGHTNESS_OFFSET) || -0.3,
@@ -120,7 +123,7 @@ class OcrService {
         y2: this.config.sharpenY2,
         y3: this.config.sharpenY3
       }) // 🎯 다층 샤픈 시스템
-      .threshold(128) // 🎯 이진화 (하드코딩된 값으로 수정)
+      .threshold(this.config.thresholdValue) // 🎯 환경변수 기반 이진화
       .median(this.config.medianRadius) // 🎯 노이즈 제거
       .png() // 🎯 PNG로 저장
       .toBuffer();
@@ -222,7 +225,7 @@ class OcrService {
       
       // 🎯 회색 글씨 최적화 전처리 (가이드 기반)
       const buffer = await img
-        .resize({ width: 1200 }) // 🎯 적당한 크기로 리사이즈
+        .resize({ width: this.config.resizeWidth }) // 🎯 환경변수 기반 리사이즈
         .grayscale()
         .linear(2.0, -0.3) // 🎯 대비 2배, 밝기 -0.3
         .sharpen({ 
@@ -230,7 +233,7 @@ class OcrService {
           m1: 1.5, m2: 1.0, // 🎯 다층 샤픈
           x1: 3, y2: 3, y3: 0.1 // 🎯 방향별 샤픈
         })
-        .threshold(150) // 🎯 높은 임계값 (수정)
+        .threshold(this.config.thresholdValue + 22) // 🎯 기본 임계값 + 22 (회색 글씨 최적화)
         .median(2) // 🎯 노이즈 제거
         .png() // 🎯 압축 손실 방지
         .toBuffer();
@@ -361,7 +364,7 @@ class OcrService {
           y2: this.config.sharpenY2,
           y3: this.config.sharpenY3
         }) // 🎯 다층 샤픈 시스템
-        .threshold(128) // 🎯 이진화 (하드코딩된 값으로 수정)
+        .threshold(this.config.thresholdValue) // 🎯 환경변수 기반 이진화
         .median(this.config.medianRadius) // 🎯 노이즈 제거
         .png() // 🎯 PNG로 저장 (압축 손실 방지)
         .toBuffer();
@@ -387,7 +390,7 @@ class OcrService {
         }
         
         // 🎯 백오프: 점진적으로 대기 시간 증가
-        const delay = 1000 * attempt;
+        const delay = OCR_CONFIG.DELAY_BASE * attempt;
         console.log(`🔄 OCR 재시도 ${attempt}/${this.config.retries}, ${delay}ms 대기`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -421,6 +424,6 @@ class OcrService {
   }
 }
 
-module.exports = OcrService;
+export default OcrService;
 
 

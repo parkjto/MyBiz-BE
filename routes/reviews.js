@@ -17,10 +17,10 @@
  */
 
 // 리뷰 관련 라우트
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const reviewsController = require('../controllers/reviewsController');
+import reviewsController from '../controllers/reviewsController.js';
 
 router.get('/', reviewsController.getReviews);
 
-module.exports = router;
+export default router;
