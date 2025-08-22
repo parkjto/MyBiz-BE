@@ -13,7 +13,7 @@
  * - sentiment: JSONB (기본값: [])
  * - keywords: TEXT[] (기본값: {})
  * - summary: TEXT (nullable)
- * - ocr_image_url: TEXT (nullable)
+ * - image_url: TEXT (nullable)
  * - status: VARCHAR (기본값: 'pending')
  * - error_message: TEXT (nullable)
  * - created_at: TIMESTAMP WITH TIME ZONE (기본값: now())
@@ -41,7 +41,7 @@ export const StoreReviewType = {
   sentiment: 'ReviewSentimentType[]',
   keywords: 'string[]',
   summary: 'string | null',
-  ocr_image_url: 'string | null',
+  image_url: 'string | null',
   status: 'pending | processing | completed | failed',
   error_message: 'string | null',
   created_at: 'timestamp',
@@ -110,7 +110,7 @@ export const reviewValidationSchema = {
   sentiment: 'array',
   keywords: 'array',
   summary: 'string | null',
-  ocr_image_url: 'string | null',
+  image_url: 'string | null',
   status: 'string (enum: pending, processing, completed, failed)',
   error_message: 'string | null'
 };
@@ -126,7 +126,7 @@ export const getDefaultReviewData = (storeId, rawText, userId = null) => ({
   sentiment: [],
   keywords: [],
   summary: null,
-  ocr_image_url: null,
+  image_url: null,
   status: REVIEW_STATUS.PENDING,
   error_message: null
 });

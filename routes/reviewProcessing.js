@@ -63,7 +63,7 @@ const singleUpload = multer({
   }
 });
 
-// 🎯 통합 리뷰 처리 플로우 (이미지 업로드 → OCR → GPT → DB 저장)
+// 🎯 통합 리뷰 처리 플로우 (이미지 업로드 → GPT → DB 저장)
 router.post('/integrated-flow', singleUpload.single('image'), integratedReviewFlow);
 
 // 🎯 배치 리뷰 처리 (여러 이미지 동시 처리)

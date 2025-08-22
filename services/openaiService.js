@@ -9,6 +9,35 @@ console.log('OpenAI API Key 설정 상태:', process.env.OPENAI_API_KEY ? '설�
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+// OpenAI 래퍼 함수
+export async function chatCompletion({messages, model='gpt-4o', temperature=0.7}) {
+  try {
+    // 프롬프트 토큰 수 계산용 임시 요청
+    const tokenRes = await client.chat.completions.create({
+      model,
+      messages,
+      temperature,
+      max_tokens: 1, // 최소 토큰으로 프롬프트 토큰만 측정
+      stream: false
+    });
+    
+    const promptTokens = tokenRes.usage?.prompt_tokens || 1024;
+    const maxTokens = Math.ceil(promptTokens * 1.5);
+    
+    const res = await client.chat.completions.create({
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens
+    });
+    
+    return res.choices[0].message;
+  } catch (error) {
+    console.error('[ERROR] OpenAI API 호출 실패:', error.message);
+    throw error;
+  }
+}
+
 // 모델이 반드시 이 스키마로 JSON을 내놓게 강제
 export const ReviewItemSchema = z.object({
   작성자: z.string().nullable().optional(),
@@ -21,9 +50,9 @@ export const ReviewItemSchema = z.object({
 
 export const ReviewArraySchema = z.array(ReviewItemSchema)
 
-function buildPrompt(ocrText) {
+function buildPrompt(reviewText) {
   return `
-너는 한국어 리뷰 정리기다. 아래 OCR 텍스트에서 "실제 리뷰"만 남기고 노이즈(배너, 메뉴, 가격표, 영수증 숫자열, '답글 쓰기' 등)를 제거하라.
+너는 한국어 리뷰 정리기다. 아래 리뷰 텍스트에서 "실제 리뷰"만 남기고 노이즈(배너, 메뉴, 가격표, 영수증 숫자열, '답글 쓰기' 등)를 제거하라.
 반드시 아래 JSON 배열만 출력하라. 설명/마크다운 금지.
 
 [
@@ -42,8 +71,8 @@ function buildPrompt(ocrText) {
 - 근거 없으면 감정은 "보통".
 - 키워드는 명사/형용사 위주로 간결히.
 
-OCR:
-${ocrText}
+리뷰 텍스트:
+${reviewText}
   `.trim()
 }
 
@@ -115,13 +144,13 @@ async function askJSON(prompt) {
   }
 }
 
-export async function analyzeOcrText(ocrText) {
-  console.log('🔍 analyzeOcrText 시작:', { 
-    ocrTextLength: ocrText?.length, 
-    ocrTextPreview: ocrText?.substring(0, 100) 
+export async function analyzeReviewText(reviewText) {
+  console.log('🔍 analyzeReviewText 시작:', { 
+    reviewTextLength: reviewText?.length, 
+    reviewTextPreview: reviewText?.substring(0, 100) 
   });
   
-  const prompt = buildPrompt(ocrText)
+  const prompt = buildPrompt(reviewText)
   console.log('📝 프롬프트 생성 완료:', { promptLength: prompt.length });
   
   try {
@@ -188,7 +217,7 @@ JSON: ${JSON.stringify(arr).slice(0, 4000)}
     return [];
     
   } catch (error) {
-    console.error('❌ analyzeOcrText 에러:', error);
+    console.error('❌ analyzeReviewText 에러:', error);
     return [];
   }
 }

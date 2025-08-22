@@ -1,40 +1,39 @@
 import { supabase } from '../config/db.js';
-import { analyzeOcrText } from './mockOpenaiService.js'; // 모킹 서비스 사용
-import MockOcrService from './mockOcrService.js'; // 모킹 OCR 서비스 사용
+import { analyzeReviewText } from './mockOpenaiService.js'; // 모킹 서비스 사용
 import { v4 as uuidv4 } from 'uuid';
 
 class ReviewProcessingService {
   constructor() {
-    this.ocrService = new MockOcrService(); // 모킹 OCR 서비스 사용
-    console.log('[INFO] ReviewProcessingService 초기화 완료 (모킹 모드)');
+    console.log('[INFO] ReviewProcessingService 초기화 완료');
   }
 
   /**
-   * 이미지 파일을 OCR → GPT → DB 저장하는 전체 플로우
+   * 이미지 파일을 GPT → DB 저장하는 전체 플로우
    */
   async processImageToDatabase(imageFile, storeId, userId = null) {
     const processId = uuidv4();
     console.log(`[INFO] [${processId}] 리뷰 이미지 처리 시작: ${imageFile.originalname}`);
 
     try {
-      // 1단계: OCR 처리
-      console.log(`[DEBUG] [${processId}] OCR 처리 시작`);
-      const rawText = await this.ocrService.processImage(imageFile.path);
-      console.log(`[DEBUG] [${processId}] OCR 처리 완료: ${rawText.length}자`);
+      // 1단계: 이미지 파일 경로만 사용
+      console.log(`[DEBUG] [${processId}] 이미지 처리 시작`);
+      const imagePath = imageFile.path;
+      console.log(`[DEBUG] [${processId}] 이미지 경로: ${imagePath}`);
 
-      // 2단계: GPT로 텍스트 정리 및 구조화
+      // 2단계: GPT로 텍스트 정리 및 구조화 (더미 텍스트 사용)
       console.log(`[DEBUG] [${processId}] GPT 분석 시작`);
-      const structuredReviews = await analyzeOcrText(rawText);
+      const dummyText = `이미지 파일: ${imageFile.originalname}`;
+      const structuredReviews = await analyzeReviewText(dummyText);
       console.log(`[DEBUG] [${processId}] GPT 분석 완료: ${structuredReviews.length}개 리뷰 추출`);
 
       // 3단계: DB 저장
       console.log(`[DEBUG] [${processId}] DB 저장 시작`);
       const savedReviews = await this.saveReviewsToDatabase(
         structuredReviews, 
-        rawText, 
+        dummyText, 
         storeId, 
         userId, 
-        imageFile.path
+        imagePath
       );
       console.log(`[INFO] [${processId}] DB 저장 완료: ${savedReviews.length}개 리뷰 저장`);
 
@@ -51,7 +50,7 @@ class ReviewProcessingService {
         processId,
         totalReviews: structuredReviews.length,
         savedReviews: savedReviews.length,
-        rawTextLength: rawText.length
+        rawTextLength: dummyText.length
       };
 
     } catch (error) {
@@ -96,7 +95,7 @@ class ReviewProcessingService {
             ...(review.단점키워드 || [])
           ],
           summary: this.generateSummary(review),
-          ocr_image_url: imagePath,
+          image_url: imagePath,
           status: 'processed',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -138,7 +137,7 @@ class ReviewProcessingService {
         sentiment: [],
         keywords: [],
         summary: '',
-        ocr_image_url: imagePath,
+        image_url: imagePath,
         status: 'error',
         error_message: `[${processId}] ${errorMessage}`,
         created_at: new Date().toISOString(),
@@ -280,7 +279,6 @@ class ReviewProcessingService {
    */
   async cleanup() {
     try {
-      await this.ocrService.cleanup();
       console.log('[INFO] ReviewProcessingService 정리 완료');
     } catch (error) {
       console.error('[ERROR] ReviewProcessingService 정리 실패:', error.message);

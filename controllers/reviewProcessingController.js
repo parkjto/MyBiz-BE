@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 const reviewProcessingService = new ReviewProcessingService();
 
 /**
- * 🎯 통합 리뷰 처리 플로우 (이미지 업로드 → OCR → GPT → DB 저장)
+ * 🎯 통합 리뷰 처리 플로우 (이미지 업로드 → GPT → DB 저장)
  * POST /api/review-processing/integrated-flow
  */
 export const integratedReviewFlow = async (req, res) => {
@@ -171,7 +171,6 @@ export const getProcessingStatus = async (req, res) => {
         active: true,
         timestamp: new Date().toISOString(),
         features: {
-          ocr: 'Tesseract.js',
           ai: 'OpenAI GPT-4o-mini',
           database: 'Supabase',
           imageProcessing: 'Sharp',

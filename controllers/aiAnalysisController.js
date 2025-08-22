@@ -1,30 +1,29 @@
-import { analyzeOcrText } from '../services/openaiService.js'
+import { analyzeReviewText } from '../services/openaiService.js'
 import { aggregate } from '../utils/aggregate.js'
 import { sanitizeOcr } from '../utils/sanitize.js'
 
 /**
- * 요청 형태 예시:
- * POST /api/ai-analysis
- * {
- *   "ocrText": "OCR에서 뽑은 긴 텍스트"   // 또는
- *   "reviews": ["리뷰1", "리뷰2"]         // (선택) 직접 리뷰 배열로 줄 수도 있음
- * }
+ * 🎯 AI 분석 컨트롤러
+ * 
+ * 입력 형식:
+ *   "reviews": [{"리뷰": "리뷰 내용"}]  // 또는
+ *   "reviewText": "리뷰에서 뽑은 긴 텍스트"   // 또는
  */
-export async function aiAnalyze(req, res) {
+export const analyzeReviews = async (req, res) => {
   try {
-    const { ocrText, reviews } = req.body || {}
+    const { reviewText, reviews } = req.body || {}
 
-    if (!ocrText && !Array.isArray(reviews)) {
-      return res.status(400).json({ error: 'INVALID_INPUT', message: 'ocrText 또는 reviews 배열 필요' })
+    if (!reviewText && !Array.isArray(reviews)) {
+      return res.status(400).json({ error: 'INVALID_INPUT', message: 'reviewText 또는 reviews 배열 필요' })
     }
 
-    // 1) OCR 텍스트 정리 (노이즈 1차 제거)
-    const textForModel = Array.isArray(reviews)
-      ? reviews.join('\n')
-      : sanitizeOcr(String(ocrText || ''))
+    // 1) 리뷰 텍스트 정리 (노이즈 1차 제거)
+    const textForModel = Array.isArray(reviews) 
+      ? reviews.map(r => r.리뷰 || r.review || '').join('\n')
+      : sanitizeOcr(String(reviewText || ''))
 
     // 2) LLM 분석
-    const items = await analyzeOcrText(textForModel)
+    const items = await analyzeReviewText(textForModel)
 
     // 3) 집계
     const { sentimentStats, pros, cons } = aggregate(items)

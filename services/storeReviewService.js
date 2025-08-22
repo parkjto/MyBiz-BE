@@ -5,10 +5,10 @@ import { supabase } from '../config/db.js';
  * @param {Object} data - 저장할 데이터
  * @param {string} data.storeId - 매장 ID (필수)
  * @param {string} data.userId - 사용자 ID (선택)
- * @param {string} data.rawText - OCR 원본 텍스트
+ * @param {string} data.rawText - 원본 리뷰 텍스트
  * @param {string} data.cleanedText - 정리된 텍스트
  * @param {Object} data.gptResult - GPT 분석 결과
- * @param {string} data.ocrImageUrl - OCR 이미지 URL (선택)
+ * @param {string} data.imageUrl - 이미지 URL (선택)
  * @returns {Object} 저장 결과
  */
 export async function saveStoreReview(data) {
@@ -34,7 +34,7 @@ export async function saveStoreReview(data) {
       positive_keywords: gptData.장점키워드 || [],
       negative_keywords: gptData.단점키워드 || [],
       summary: gptData.리뷰 || '',
-      ocr_image_url: data.ocrImageUrl || null,
+      image_url: data.imageUrl || null,
       status: 'completed',
       error_message: null
     };
