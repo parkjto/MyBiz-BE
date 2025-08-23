@@ -1,441 +1,326 @@
-# MyBiz 백엔드 API 프론트엔드 연동 가이드
+# MyBiz 매출 분석 API - 프론트엔드 연동 가이드
 
-## 🚀 개요
+## 🔐 인증 설정
 
-이 문서는 MyBiz 백엔드 API를 프론트엔드에서 사용하기 위한 연동 가이드입니다. 
-카카오/네이버 소셜 로그인, 스토어 관리, 리뷰 스크래핑, AI 분석 등의 기능을 포함합니다.
+### JWT 토큰 획득
+```javascript
+// 카카오/네이버 로그인 후 JWT 토큰 받기
+const response = await fetch('/api/auth/kakao/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: '인가코드' })
+});
 
-## 🔐 인증 시스템
-
-### JWT 토큰 기반 인증
-- 모든 보호된 API는 `Authorization: Bearer {token}` 헤더가 필요합니다
-- 토큰은 로그인 성공 시 발급되며 7일간 유효합니다
-
-### 응답 형식
-```json
-{
-  "success": true/false,
-  "data": {...} | "message": "...",
-  "error": "에러 메시지" // 실패 시에만
-}
+const { token } = await response.json();
+// 이 토큰을 모든 API 호출에 사용
 ```
 
-## 📱 소셜 로그인
+## 📊 매출 분석 API 연동
 
-### 1. 카카오 로그인
-
-#### 1-1. 로그인 URL 생성
+### 1. CSV 업로드
 ```javascript
-// GET /api/auth/kakao/auth-url
-const response = await fetch('/api/auth/kakao/auth-url');
-const { authUrl } = await response.json();
-
-// 사용자를 카카오 로그인 페이지로 리다이렉트
-window.location.href = authUrl;
-```
-
-#### 1-2. 카카오 콜백 처리
-```javascript
-// 카카오 로그인 완료 후 리다이렉트된 페이지에서
-const urlParams = new URLSearchParams(window.location.search);
-const code = urlParams.get('code');
-
-if (code) {
-  // 로그인 API 호출
-  const loginResponse = await fetch('/api/auth/kakao/login', {
+const uploadCSV = async (file, token) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await fetch('/api/sales/upload', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ code })
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData
   });
   
-  const { token, user } = await loginResponse.json();
-  
-  // 토큰을 로컬 스토리지에 저장
-  localStorage.setItem('authToken', token);
-  localStorage.setItem('user', JSON.stringify(user));
-  
-  // 메인 페이지로 이동
-  window.location.href = '/dashboard';
-}
+  return await response.json();
+};
+
+// 사용 예시
+const fileInput = document.getElementById('csvFile');
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const result = await uploadCSV(file, token);
+  console.log('업로드 결과:', result);
+});
 ```
 
-### 2. 네이버 로그인
-
-#### 2-1. 로그인 URL 생성
+### 2. 하이라이트 분석
 ```javascript
-// GET /api/auth/naver/auth-url
-const response = await fetch('/api/auth/naver/auth-url');
-const { authUrl } = await response.json();
+const getHighlights = async (startDate, endDate, token) => {
+  const response = await fetch(
+    `/api/sales/highlights?start=${startDate}&end=${endDate}`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  return await response.json();
+};
 
-// 사용자를 네이버 로그인 페이지로 리다이렉트
-window.location.href = authUrl;
+// 사용 예시
+const highlights = await getHighlights('2025-01-01', '2025-06-30', token);
+console.log('총매출:', highlights.data.totalRevenue);
+console.log('Top3:', highlights.data.top3);
+console.log('최대성장:', highlights.data.maxGrowth);
 ```
 
-#### 2-2. 네이버 콜백 처리
+### 3. 수익성(ROI) 분석
 ```javascript
-// 네이버 로그인 완료 후 리다이렉트된 페이지에서
-const urlParams = new URLSearchParams(window.location.search);
-const code = urlParams.get('code');
+const getProfitability = async (startDate, endDate, profitRate = 0.7, token) => {
+  const response = await fetch(
+    `/api/sales/profitability?start=${startDate}&end=${endDate}&rate=${profitRate}`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  return await response.json();
+};
 
-if (code) {
-  // 로그인 API 호출
-  const loginResponse = await fetch('/api/auth/naver/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ code })
-  });
-  
-  const { token, user } = await loginResponse.json();
-  
-  // 토큰을 로컬 스토리지에 저장
-  localStorage.setItem('authToken', token);
-  localStorage.setItem('user', JSON.stringify(user));
-  
-  // 메인 페이지로 이동
-  window.location.href = '/dashboard';
-}
+// 사용 예시
+const roi = await getProfitability('2025-01-01', '2025-06-30', 0.7, token);
+console.log('총매출:', roi.data.totalRevenue);
+console.log('수익률:', roi.data.profitRate);
+console.log('메뉴별:', roi.data.items);
 ```
 
-## 🏪 스토어 관리
-
-### 1. 스토어 목록 조회
+### 4. 시간대별 분석
 ```javascript
-// GET /api/stores
-const response = await fetch('/api/stores', {
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    'Content-Type': 'application/json',
+const getTimeAnalysis = async (startDate, endDate, token) => {
+  const [hourly, weekday] = await Promise.all([
+    fetch(`/api/sales/time-of-day?start=${startDate}&end=${endDate}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(r => r.json()),
+    fetch(`/api/sales/weekday?start=${startDate}&end=${endDate}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(r => r.json())
+  ]);
+  
+  return { hourly: hourly.data, weekday: weekday.data };
+};
+```
+
+### 5. 월별 상세 분석
+```javascript
+const getMonthlyDetails = async (year, month, token) => {
+  const [weekly, summary] = await Promise.all([
+    fetch(`/api/sales/weekly-by-month?year=${year}&month=${month}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(r => r.json()),
+    fetch(`/api/sales/month-summary?year=${year}&month=${month}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(r => r.json())
+  ]);
+  
+  return { weekly: weekly.data, summary: summary.data };
+};
+```
+
+## 📈 차트 연동 예제
+
+### Flutter 차트 예시
+```dart
+// 월별 라인차트
+LineChart(
+  LineChartData(
+    spots: monthlyData.map((data) => 
+      FlSpot(data.monthIndex, data.total / 1000000) // 백만원 단위
+    ).toList(),
+    titles: FlTitlesData(
+      leftTitles: SideTitles(
+        showTitles: true,
+        getTitles: (value) => '${value.toInt()}백만원'
+      )
+    )
+  )
+)
+
+// 카테고리 파이차트
+PieChart(
+  PieChartData(
+    sections: categoryData.map((data) => 
+      PieChartSectionData(
+        value: data.pct, 
+        color: getCategoryColor(data.category), 
+        title: '${data.category}\n${data.pct}%'
+      )
+    ).toList()
+  )
+)
+
+// 베스트셀러 바차트
+BarChart(
+  BarChartData(
+    barGroups: bestsellerData.asMap().entries.map((entry) => 
+      BarChartGroupData(
+        x: entry.key,
+        barRods: [BarChartRodData(y: entry.value.total / 10000)] // 만원 단위
+      )
+    ).toList()
+  )
+)
+```
+
+### React 차트 예시
+```javascript
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+
+const MonthlyChart = ({ data }) => (
+  <LineChart width={600} height={300} data={data}>
+    <CartesianGrid strokeDasharray="3 3" />
+    <XAxis dataKey="month" />
+    <YAxis />
+    <Tooltip formatter={(value) => `${(value/10000).toFixed(0)}만원`} />
+    <Legend />
+    <Line type="monotone" dataKey="total" stroke="#8884d8" />
+  </LineChart>
+);
+```
+
+## 🎯 음성 명령 연동
+
+### 음성 → API 매핑
+```javascript
+const voiceCommandHandler = async (command, token) => {
+  const lowerCommand = command.toLowerCase();
+  
+  if (lowerCommand.includes('베스트셀러') || lowerCommand.includes('잘팔린')) {
+    const limit = lowerCommand.match(/\d+/)?.[0] || 10;
+    return await getBestsellers('2025-01-01', '2025-06-30', limit, token);
   }
-});
-
-const { data: stores, count } = await response.json();
-```
-
-### 2. 스토어 생성
-```javascript
-// POST /api/stores
-const response = await fetch('/api/stores', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    store_name: '테스트 카페',
-    address: '서울시 강남구 테헤란로 123',
-    category: '카페',
-    phone: '02-1234-5678'
-  })
-});
-
-const { data: newStore } = await response.json();
-```
-
-### 3. 스토어 수정
-```javascript
-// PATCH /api/stores/{id}
-const response = await fetch(`/api/stores/${storeId}`, {
-  method: 'PATCH',
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    store_name: '수정된 카페명',
-    phone: '02-9876-5432'
-  })
-});
-
-const { data: updatedStore } = await response.json();
-```
-
-### 4. 스토어 삭제
-```javascript
-// DELETE /api/stores/{id}
-const response = await fetch(`/api/stores/${storeId}`, {
-  method: 'DELETE',
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+  
+  if (lowerCommand.includes('수익성') || lowerCommand.includes('roi')) {
+    return await getProfitability('2025-01-01', '2025-06-30', 0.7, token);
   }
-});
-
-const { message } = await response.json();
-```
-
-## 🔍 리뷰 스크래핑
-
-### 1. 리뷰 스크래핑 시작
-```javascript
-// POST /api/scraper/reviews
-const response = await fetch('/api/scraper/reviews', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    userStoreId: storeId // 스토어 ID
-  })
-});
-
-const { data: scrapingResult } = await response.json();
-```
-
-### 2. 네이버 세션 설정
-```javascript
-// POST /api/scraper/session
-const response = await fetch('/api/scraper/session', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    userStoreId: storeId,
-    cookies: naverCookies, // 네이버 로그인 쿠키
-    expiresAt: expiresAt   // 만료 시간
-  })
-});
-
-const { message } = await response.json();
-```
-
-## 🤖 AI 리뷰 분석
-
-### 1. 리뷰 분석 실행
-```javascript
-// POST /api/reviews/analysis/analyze
-const response = await fetch('/api/reviews/analysis/analyze', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    reviewId: reviewId // 분석할 리뷰 ID
-  })
-});
-
-const { data: analysisResult } = await response.json();
-```
-
-## 🛠️ 유틸리티 함수
-
-### 1. API 호출 헬퍼 함수
-```javascript
-class ApiClient {
-  constructor() {
-    this.baseUrl = 'http://localhost:3000/api';
-    this.token = localStorage.getItem('authToken');
+  
+  if (lowerCommand.includes('하이라이트') || lowerCommand.includes('요약')) {
+    return await getHighlights('2025-01-01', '2025-06-30', token);
   }
+  
+  if (lowerCommand.includes('시간대') || lowerCommand.includes('혼잡')) {
+    return await getTimeAnalysis('2025-01-01', '2025-06-30', token);
+  }
+  
+  return { error: '명령을 이해할 수 없습니다' };
+};
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${endpoint}`;
+// 사용 예시
+const result = await voiceCommandHandler('베스트셀러 3개 알려줘', token);
+```
+
+## 🚀 성능 최적화
+
+### 캐싱 전략
+```javascript
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5분
+
+const getCachedData = async (key, fetchFunction) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  
+  const data = await fetchFunction();
+  cache.set(key, { data, timestamp: Date.now() });
+  return data;
+};
+
+// 사용 예시
+const highlights = await getCachedData(
+  `highlights_${startDate}_${endDate}`,
+  () => getHighlights(startDate, endDate, token)
+);
+```
+
+### 에러 처리
+```javascript
+const apiCall = async (url, options) => {
+  try {
+    const response = await fetch(url, options);
     
+    if (!response.ok) {
+      if (response.status === 401) {
+        // 토큰 만료, 재로그인 필요
+        throw new Error('인증이 만료되었습니다');
+      }
+      throw new Error(`API 오류: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API 호출 실패:', error);
+    throw error;
+  }
+};
+```
+
+## 📱 모바일 최적화
+
+### 반응형 UI 패턴
+```javascript
+// 화면 크기에 따른 차트 크기 조정
+const getChartSize = () => {
+  const width = window.innerWidth;
+  if (width < 768) return { width: width - 40, height: 200 }; // 모바일
+  if (width < 1024) return { width: 600, height: 300 }; // 태블릿
+  return { width: 800, height: 400 }; // 데스크톱
+};
+
+// 터치 제스처 지원
+const addTouchSupport = (chartElement) => {
+  let startX = 0;
+  chartElement.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+  });
+  
+  chartElement.addEventListener('touchend', (e) => {
+    const endX = e.changedTouches[0].clientX;
+    const diff = startX - endX;
+    
+    if (Math.abs(diff) > 50) {
+      // 스와이프 제스처 처리
+      if (diff > 0) {
+        // 왼쪽 스와이프: 다음 기간
+        loadNextPeriod();
+      } else {
+        // 오른쪽 스와이프: 이전 기간
+        loadPrevPeriod();
+      }
+    }
+  });
+};
+```
+
+## 🔧 개발 환경 설정
+
+### 환경변수
+```bash
+# .env
+REACT_APP_API_BASE_URL=http://localhost:3000
+REACT_APP_UPLOAD_MAX_SIZE=20971520 # 20MB
+```
+
+### API 클라이언트 설정
+```javascript
+// apiClient.js
+class ApiClient {
+  constructor(baseURL) {
+    this.baseURL = baseURL;
+    this.token = null;
+  }
+  
+  setToken(token) {
+    this.token = token;
+  }
+  
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
     const config = {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const response = await fetch(url, config);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'API 요청 실패');
+        ...options.headers
       }
-      
-      return data;
-    } catch (error) {
-      console.error('API 요청 에러:', error);
-      throw error;
-    }
-  }
-
-  // GET 요청
-  async get(endpoint) {
-    return this.request(endpoint);
-  }
-
-  // POST 요청
-  async post(endpoint, body) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  }
-
-  // PUT 요청
-  async put(endpoint, body) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    });
-  }
-
-  // PATCH 요청
-  async patch(endpoint, body) {
-    return this.request(endpoint, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    });
-  }
-
-  // DELETE 요청
-  async delete(endpoint) {
-    return this.request(endpoint, {
-      method: 'DELETE',
-    });
+    };
+    
+    return await fetch(url, config);
   }
 }
 
-// 사용 예시
-const api = new ApiClient();
-
-// 스토어 목록 조회
-const stores = await api.get('/stores');
-
-// 새 스토어 생성
-const newStore = await api.post('/stores', {
-  store_name: '새로운 카페',
-  address: '서울시 강남구'
-});
+export const apiClient = new ApiClient(process.env.REACT_APP_API_BASE_URL);
 ```
 
-### 2. 인증 상태 관리
-```javascript
-class AuthManager {
-  constructor() {
-    this.token = localStorage.getItem('authToken');
-    this.user = JSON.parse(localStorage.getItem('user') || 'null');
-  }
-
-  isAuthenticated() {
-    return !!this.token && !!this.user;
-  }
-
-  getToken() {
-    return this.token;
-  }
-
-  getUser() {
-    return this.user;
-  }
-
-  setAuth(token, user) {
-    this.token = token;
-    this.user = user;
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('user', JSON.stringify(user));
-  }
-
-  clearAuth() {
-    this.token = null;
-    this.user = null;
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-  }
-
-  async logout() {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-      });
-    } catch (error) {
-      console.error('로그아웃 에러:', error);
-    } finally {
-      this.clearAuth();
-      window.location.href = '/login';
-    }
-  }
-}
-
-// 사용 예시
-const auth = new AuthManager();
-
-if (!auth.isAuthenticated()) {
-  window.location.href = '/login';
-}
-
-// 로그아웃
-await auth.logout();
-```
-
-## 📋 에러 처리
-
-### 1. 공통 에러 처리
-```javascript
-function handleApiError(error) {
-  if (error.message.includes('토큰')) {
-    // 토큰 만료 또는 유효하지 않음
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-    return;
-  }
-
-  if (error.message.includes('권한')) {
-    // 권한 없음
-    alert('해당 작업을 수행할 권한이 없습니다.');
-    return;
-  }
-
-  // 기타 에러
-  console.error('API 에러:', error);
-  alert(`오류가 발생했습니다: ${error.message}`);
-}
-```
-
-### 2. API 응답 검증
-```javascript
-function validateApiResponse(response) {
-  if (!response.success) {
-    throw new Error(response.error || response.message || '알 수 없는 오류');
-  }
-  return response;
-}
-
-// 사용 예시
-try {
-  const response = await api.get('/stores');
-  const validatedResponse = validateApiResponse(response);
-  return validatedResponse.data;
-} catch (error) {
-  handleApiError(error);
-}
-```
-
-## 🔒 보안 고려사항
-
-1. **토큰 보안**: JWT 토큰을 안전하게 저장하고 전송
-2. **HTTPS**: 프로덕션 환경에서는 반드시 HTTPS 사용
-3. **입력 검증**: 모든 사용자 입력에 대한 클라이언트/서버 측 검증
-4. **CORS**: 허용된 도메인에서만 API 접근 가능
-
-## 📚 추가 리소스
-
-- **Swagger 문서**: `http://localhost:3000/api-docs/`
-- **API 상태 확인**: `http://localhost:3000/health`
-- **에러 코드**: 각 API 응답의 `error` 필드 참조
-
-## 🚀 시작하기
-
-1. 환경 변수 설정 확인
-2. 백엔드 서버 실행
-3. 위의 코드 예시를 참고하여 프론트엔드 구현
-4. API 테스트 및 디버깅
-
----
-
-**문의사항**: 개발 중 문제가 발생하면 로그를 확인하고 백엔드 팀에 문의하세요.
+이제 프론트엔드에서 MyBiz 매출 분석 API를 완벽하게 활용할 수 있습니다! 🚀
