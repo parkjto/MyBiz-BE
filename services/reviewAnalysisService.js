@@ -1,6 +1,8 @@
 import { supabase } from '../utils/supabaseClient.js';
 import { logger } from '../utils/logger.js';
-import { chatCompletion } from './openaiService.js';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export class ReviewAnalysisService {
   
@@ -18,7 +20,7 @@ export class ReviewAnalysisService {
       const prompt = this.createAnalysisPrompt(reviewData);
       
       // GPT API 호출
-      const gptResponse = await chatCompletion({
+      const gptResponse = await openai.chat.completions.create({
         messages: [
           {
             role: 'system',
@@ -34,7 +36,7 @@ export class ReviewAnalysisService {
       });
 
       // GPT 응답 파싱
-      const analysisResult = this.parseGptResponse(gptResponse.content);
+      const analysisResult = this.parseGptResponse(gptResponse.choices[0].message.content);
       
       // 분석 결과를 review_analysis 테이블에 저장
       const savedAnalysis = await this.saveAnalysisResult(reviewId, analysisResult);
