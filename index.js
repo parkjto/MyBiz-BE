@@ -10,6 +10,7 @@ import scraperRoutes from './routes/scraperRoutes.js';
 import reviewAnalysisRoutes from './routes/reviewAnalysisRoutes.js';
 import storesRoutes from './routes/storesRoutes.js';
 import naverLocalRoutes from './routes/naverLocalRoutes.js';
+import salesRoutes from './routes/salesRoutes.js';
 
 import { errorHandler } from './middlewares/errorHandler.js';
 import { rateLimiter } from './middlewares/rateLimiter.js';
@@ -25,6 +26,7 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
 
 // Logging
 app.use((req, res, next) => {
@@ -41,6 +43,7 @@ app.use('/api/scraper', scraperRoutes);
 app.use('/api/reviews/analysis', reviewAnalysisRoutes);
 app.use('/api/stores', storesRoutes);
 app.use('/api/naver', naverLocalRoutes);
+app.use('/api/sales', salesRoutes);
 
 // Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

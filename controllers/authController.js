@@ -20,7 +20,7 @@ export const login = async (req, res, next) => {
     const token = jwt.sign(
       { 
         id: user.id, 
-        provider: user.provider,
+        provider: provider,
         email: user.email 
       }, 
       process.env.JWT_SECRET, 
@@ -37,7 +37,7 @@ export const login = async (req, res, next) => {
         id: user.id,
         email: user.email,
         nickname: user.nickname,
-        provider: user.provider,
+        provider: provider,
         profile_image_url: user.profile_image_url
       }
     });
@@ -66,7 +66,6 @@ async function getUserOrCreate(userId, provider) {
       [`${provider}_id`]: userId,
       email: `${userId}@${provider}.com`, // 임시 이메일
       nickname: `${provider} 사용자`,
-      provider: provider,
       created_at: new Date().toISOString()
     };
 
