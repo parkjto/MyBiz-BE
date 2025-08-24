@@ -1,288 +1,345 @@
-import { Router } from 'express';
-import { uploadImage } from '../middlewares/upload.js';
-import { smartEnhanceImage } from '../services/imageService.js';
-import { uploadToSupabase } from '../services/supabaseStorageService.js';
-import { generateAdCopies, generateFromImage } from '../services/openaiService.js';
+import express from 'express';
+import multer from 'multer';
+import { 
+  detectImageType, 
+  analyzeImageQuality, 
+  generateOptimalParameters,
+  enhanceImage 
+} from '../services/smartImageAnalysisService.js';
 
-const router = Router();
+const router = express.Router();
 
-/**
- * 텍스트만으로 광고 문구 생성 (완전 무저장)
- * POST /api/ad/generate
- */
-router.post('/generate', async (req, res) => {
-  try {
-    const { productName, productDesc, keywords = [], num = 4, maxWords = 16 } = req.body;
-
-    // 입력값 검증
-    if (!productName || !productDesc) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '제품명과 설명은 필수입니다.' 
-      });
+// Multer 설정
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('이미지 파일만 업로드 가능합니다.'), false);
     }
-
-    if (num < 1 || num > 8) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '생성 개수는 1-8개 사이여야 합니다.' 
-      });
-    }
-
-    if (maxWords < 3 || maxWords > 32) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '최대 단어 수는 3-32개 사이여야 합니다.' 
-      });
-    }
-
-    const result = await generateAdCopies({
-      productName,
-      productDesc,
-      keywords: Array.isArray(keywords) ? keywords : [],
-      num,
-      maxWords
-    });
-
-    res.json({ 
-      ok: true, 
-      message: '광고 문구 생성 완료 - 사용자가 직접 저장하세요',
-      generatedAt: new Date().toISOString(),
-      productInfo: {
-        productName,
-        productDesc,
-        keywords: Array.isArray(keywords) ? keywords : []
-      },
-      copies: result.copies,
-      important: '⚠️ 생성된 광고 문구는 자동으로 저장되지 않습니다!',
-      userAction: '핸드폰 메모, 파일, 클립보드 등에 직접 저장하세요.',
-      note: '서버에서는 어떤 데이터도 저장하지 않습니다.'
-    });
-
-  } catch (error) {
-    console.error('광고 문구 생성 에러:', error);
-    res.status(500).json({ 
-      ok: false, 
-      message: error.message || '광고 문구 생성에 실패했습니다.' 
-    });
   }
 });
 
 /**
- * 이미지 보정 전용 (완전 무저장)
- * POST /api/ad/enhance-image
+ * 이미지 분석 API
+ * POST /api/analyze-image
  */
-router.post('/enhance-image', (req, res, next) => {
-  uploadImage(req, res, function (err) {
-    if (err) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: err.message 
-      });
-    }
-    next();
-  });
-}, async (req, res) => {
+router.post('/analyze-image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: 'image 필드로 이미지를 업로드하세요.' 
-      });
+      return res.status(400).json({ error: '이미지 파일이 필요합니다.' });
     }
 
-    // 스마트 이미지 보정
-    const result = await smartEnhanceImage(req.file.buffer, { maxSize: 1600 });
-    const enhanced = result.enhancedImage;
+    const { buffer } = req.file;
+    
+    // 이미지 타입 감지
+    const imageType = await detectImageType(buffer);
+    
+    // 이미지 품질 분석
+    const quality = await analyzeImageQuality(buffer);
+    
+    // 분석 결과에 이미지 타입 추가
+    const analysis = {
+      ...quality,
+      imageType
+    };
 
-    // Base64로 인코딩하여 즉시 응답 (저장 없음)
-    const base64Image = enhanced.toString('base64');
-
-    res.json({ 
-      ok: true, 
-      message: '스마트 이미지 보정 완료 - 사용자가 직접 저장하세요',
-      base64Image: `data:image/webp;base64,${base64Image}`,
-      originalSize: req.file.size,
-      enhancedSize: enhanced.length,
-      format: 'webp',
-      // 스마트 분석 정보 추가
-      smartAnalysis: {
-        imageType: result.analysis.imageType,
-        quality: result.analysis.quality,
-        parameters: result.analysis.parameters,
-        compressionRate: result.analysis.compressionRate
-      },
-      note: '보정된 이미지는 Base64 형식으로 반환됩니다. 클라이언트에서 적절히 처리하세요.'
-    });
-
+    res.json(analysis);
   } catch (error) {
-    console.error('이미지 보정 에러:', error);
+    console.error('이미지 분석 오류:', error);
     res.status(500).json({ 
-      ok: false, 
-      message: error.message || '이미지 보정에 실패했습니다.' 
+      error: '이미지 분석 중 오류가 발생했습니다.',
+      details: error.message 
     });
   }
 });
 
 /**
- * 이미지 기반 맞춤 광고 문구 생성 (완전 무저장)
- * POST /api/ad/generate-from-image
+ * 이미지 보정 API
+ * POST /api/enhance-image
  */
-router.post('/generate-from-image', async (req, res) => {
+router.post('/enhance-image', upload.single('image'), async (req, res) => {
   try {
-    const { imageUrl, productName, productDesc, keywords = [], num = 3, maxWords = 16 } = req.body;
-
-    // 입력값 검증
-    if (!imageUrl || !productName || !productDesc) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '이미지 URL, 제품명, 설명은 필수입니다.' 
-      });
+    if (!req.file) {
+      return res.status(400).json({ error: '이미지 파일이 필요합니다.' });
     }
 
-    if (num < 1 || num > 6) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '생성 개수는 1-6개 사이여야 합니다.' 
-      });
-    }
-
-    if (maxWords < 3 || maxWords > 32) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '최대 단어 수는 3-32개 사이여야 합니다.' 
-      });
-    }
-
-    // URL 유효성 검증
+    const { buffer } = req.file;
+    
+    // 이미지 타입 감지
+    const imageType = await detectImageType(buffer);
+    
+    // 이미지 품질 분석
+    const quality = await analyzeImageQuality(buffer);
+    
+    // 최적 보정 파라미터 생성
+    const params = generateOptimalParameters(imageType, quality);
+    
+    // 이미지 보정 실행
+    const enhancedBuffer = await enhanceImage(buffer, params);
+    
+    // 보정된 이미지를 base64로 인코딩
+    const enhancedImage = enhancedBuffer.toString('base64');
+    
+    // 보정된 이미지 재분석 (선택사항)
+    let enhancedAnalysis = null;
     try {
-      new URL(imageUrl);
-    } catch (urlError) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '유효한 이미지 URL을 입력해주세요.' 
-      });
+      enhancedAnalysis = await analyzeImageQuality(enhancedBuffer);
+      enhancedAnalysis.imageType = imageType;
+    } catch (error) {
+      console.warn('보정된 이미지 재분석 실패:', error.message);
     }
 
-    // 이미지 기반 맞춤 광고 문구 생성
-    const result = await generateFromImage({
-      imageUrl,
-      productName,
-      productDesc,
-      keywords: Array.isArray(keywords) ? keywords : [],
-      num,
-      maxWords
+    res.json({
+      enhancedImage,
+      originalAnalysis: { ...quality, imageType },
+      enhancedAnalysis,
+      appliedParameters: params
     });
-
-    res.json({ 
-      ok: true, 
-      message: '이미지 기반 맞춤 광고 문구 생성 완료 - 사용자가 직접 저장하세요',
-      generatedAt: new Date().toISOString(),
-      imageUrl,
-      productInfo: {
-        productName,
-        productDesc,
-        keywords: Array.isArray(keywords) ? keywords : []
-      },
-      ...result,
-      important: '⚠️ 생성된 광고 문구는 자동으로 저장되지 않습니다!',
-      userAction: '핸드폰 메모, 파일, 클립보드 등에 직접 저장하세요.',
-      note: '서버에서는 어떤 데이터도 저장하지 않습니다.'
-    });
-
   } catch (error) {
-    console.error('이미지 기반 광고 문구 생성 에러:', error);
+    console.error('이미지 보정 오류:', error);
     res.status(500).json({ 
-      ok: false, 
-      message: error.message || '이미지 기반 광고 문구 생성에 실패했습니다.' 
+      error: '이미지 보정 중 오류가 발생했습니다.',
+      details: error.message 
     });
   }
 });
 
 /**
- * 이미지 업로드 + 보정 + 광고 문구 생성 (완전 무저장)
- * POST /api/ad/generate-with-image
+ * 이미지 타입별 보정 파라미터 조회 API
+ * GET /api/enhancement-parameters/:imageType
  */
-router.post('/generate-with-image', (req, res, next) => {
-  // multer 에러를 캐치하기 위해 분리
-  uploadImage(req, res, function (err) {
-    if (err) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: err.message 
-      });
-    }
-    next();
-  });
-}, async (req, res) => {
+router.get('/enhancement-parameters/:imageType', (req, res) => {
   try {
-    const { productName, productDesc, keywords = '', num = 3, maxWords = 16 } = req.body;
-
-    // 입력값 검증
-    if (!productName || !productDesc) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: '제품명과 설명은 필수입니다.' 
-      });
+    const { imageType } = req.params;
+    const { quality } = req.query;
+    
+    // 기본 품질 객체 생성
+    const defaultQuality = {
+      isDark: false,
+      isBright: false,
+      isLowContrast: false,
+      isBlurry: false,
+      isNoisy: false,
+      brightness: 128,
+      contrast: 50,
+      sharpness: 20,
+      noise: 15,
+      colorAccuracy: 70,
+      exposure: 65,
+      composition: 70,
+      technicalQuality: 65,
+      qualityGrade: 'B'
+    };
+    
+    // 쿼리 파라미터로 품질 조정
+    if (quality) {
+      const qualityParams = JSON.parse(decodeURIComponent(quality));
+      Object.assign(defaultQuality, qualityParams);
     }
-
-    if (!req.file) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: 'image 필드로 이미지를 업로드하세요.' 
-      });
-    }
-
-    // 파라미터 정규화
-    const parsedKeywords = keywords ? keywords.split(",").map(s => s.trim()).filter(Boolean) : [];
-    const parsedNum = Math.min(6, Math.max(1, parseInt(num) || 3));
-    const parsedMaxWords = Math.min(32, Math.max(3, parseInt(maxWords) || 16));
-
-    // 1) 이미지 자동 보정
-    const enhanced = await autoEnhanceImage(req.file.buffer, { maxSize: 1600 });
-
-    // 2) 보정된 이미지를 Base64로 변환
-    const base64Image = enhanced.toString('base64');
-
-    // 3) 이미지 기반 맞춤 광고 문구 생성 (Base64 이미지 사용)
-    const result = await generateFromImage({
-      imageUrl: `data:image/webp;base64,${base64Image}`,
-      productName,
-      productDesc,
-      keywords: parsedKeywords,
-      num: parsedNum,
-      maxWords: parsedMaxWords
+    
+    // 최적 보정 파라미터 생성
+    const params = generateOptimalParameters(imageType, defaultQuality);
+    
+    res.json({
+      imageType,
+      quality: defaultQuality,
+      parameters: params
     });
-
-    res.json({ 
-      ok: true, 
-      message: '이미지 업로드 + 보정 + 맞춤 광고 문구 생성 완료 - 사용자가 직접 저장하세요',
-      generatedAt: new Date().toISOString(),
-      enhancedImage: {
-        base64: `data:image/webp;base64,${base64Image}`,
-        originalSize: req.file.size,
-        enhancedSize: enhanced.length,
-        format: 'webp'
-      },
-      productInfo: {
-        productName,
-        productDesc,
-        keywords: parsedKeywords
-      },
-      ...result,
-      important: '⚠️ 생성된 모든 데이터는 자동으로 저장되지 않습니다!',
-      userAction: '핸드폰 앨범, 메모, 파일 등에 직접 저장하세요.',
-      note: '서버에서는 어떤 데이터도 저장하지 않습니다.',
-      downloadTip: 'Base64 이미지를 복사하여 이미지 뷰어에서 열거나, 온라인 Base64 to Image 변환기 사용'
-    });
-
   } catch (error) {
-    console.error('이미지 업로드 + 광고 문구 생성 에러:', error);
+    console.error('파라미터 조회 오류:', error);
     res.status(500).json({ 
-      ok: false, 
-      message: error.message || '이미지 업로드 + 광고 문구 생성에 실패했습니다.' 
+      error: '파라미터 조회 중 오류가 발생했습니다.',
+      details: error.message 
     });
   }
 });
+
+/**
+ * 이미지 품질 진단 API
+ * POST /api/diagnose-image
+ */
+router.post('/diagnose-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '이미지 파일이 필요합니다.' });
+    }
+
+    const { buffer } = req.file;
+    
+    // 이미지 타입 감지
+    const imageType = await detectImageType(buffer);
+    
+    // 이미지 품질 분석
+    const quality = await analyzeImageQuality(buffer);
+    
+    // 품질 진단 및 개선 권장사항
+    const diagnosis = generateQualityDiagnosis(quality, imageType);
+    
+    res.json({
+      imageType,
+      quality,
+      diagnosis
+    });
+  } catch (error) {
+    console.error('이미지 진단 오류:', error);
+    res.status(500).json({ 
+      error: '이미지 진단 중 오류가 발생했습니다.',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * 품질 진단 및 개선 권장사항 생성
+ */
+function generateQualityDiagnosis(quality, imageType) {
+  const recommendations = [];
+  const issues = [];
+  
+  // 밝기 관련 진단
+  if (quality.isDark) {
+    issues.push('어두운 이미지');
+    recommendations.push('밝기를 15-20% 증가시키는 것을 권장합니다.');
+  } else if (quality.isBright) {
+    issues.push('과도하게 밝은 이미지');
+    recommendations.push('밝기를 5-10% 감소시키는 것을 권장합니다.');
+  }
+  
+  // 대비 관련 진단
+  if (quality.isLowContrast) {
+    issues.push('낮은 대비');
+    recommendations.push('대비를 20-25% 증가시키는 것을 권장합니다.');
+  }
+  
+  // 선명도 관련 진단
+  if (quality.isBlurry) {
+    issues.push('흐린 이미지');
+    recommendations.push('선명도를 30-40% 증가시키는 것을 권장합니다.');
+  }
+  
+  // 노이즈 관련 진단
+  if (quality.isNoisy) {
+    issues.push('노이즈가 많음');
+    recommendations.push('노이즈 감소를 40-60% 적용하는 것을 권장합니다.');
+  }
+  
+  // 이미지 타입별 특별 권장사항
+  const typeSpecificRecommendations = getTypeSpecificRecommendations(imageType, quality);
+  recommendations.push(...typeSpecificRecommendations);
+  
+  // 전체 품질 등급별 권장사항
+  const gradeRecommendations = getGradeSpecificRecommendations(quality.qualityGrade);
+  recommendations.push(...gradeRecommendations);
+  
+  return {
+    issues,
+    recommendations,
+    overallScore: quality.technicalQuality,
+    grade: quality.qualityGrade,
+    priority: getPriorityLevel(issues.length, quality.technicalQuality)
+  };
+}
+
+/**
+ * 이미지 타입별 특별 권장사항
+ */
+function getTypeSpecificRecommendations(imageType, quality) {
+  const recommendations = [];
+  
+  switch (imageType) {
+    case 'food':
+      if (quality.saturation < 60) {
+        recommendations.push('음식 이미지의 경우 채도를 10-15% 증가시키는 것을 권장합니다.');
+      }
+      if (quality.brightness < 120) {
+        recommendations.push('음식 이미지의 경우 밝기를 8-12% 증가시키는 것을 권장합니다.');
+      }
+      break;
+      
+    case 'portrait':
+      if (quality.sharpness > 25) {
+        recommendations.push('인물 이미지의 경우 선명도를 15-20% 감소시키는 것을 권장합니다.');
+      }
+      if (quality.saturation > 80) {
+        recommendations.push('인물 이미지의 경우 채도를 5-8% 감소시키는 것을 권장합니다.');
+      }
+      break;
+      
+    case 'landscape':
+      if (quality.contrast < 40) {
+        recommendations.push('풍경 이미지의 경우 대비를 15-20% 증가시키는 것을 권장합니다.');
+      }
+      if (quality.sharpness < 20) {
+        recommendations.push('풍경 이미지의 경우 선명도를 25-35% 증가시키는 것을 권장합니다.');
+      }
+      break;
+      
+    case 'document':
+      if (quality.brightness < 160) {
+        recommendations.push('문서 이미지의 경우 밝기를 15-20% 증가시키는 것을 권장합니다.');
+      }
+      if (quality.contrast < 35) {
+        recommendations.push('문서 이미지의 경우 대비를 20-25% 증가시키는 것을 권장합니다.');
+      }
+      break;
+      
+    case 'product':
+      if (quality.colorAccuracy < 75) {
+        recommendations.push('제품 이미지의 경우 색상 정확도를 위해 화이트 밸런스를 조정하는 것을 권장합니다.');
+      }
+      if (quality.sharpness < 25) {
+        recommendations.push('제품 이미지의 경우 선명도를 20-30% 증가시키는 것을 권장합니다.');
+      }
+      break;
+  }
+  
+  return recommendations;
+}
+
+/**
+ * 품질 등급별 권장사항
+ */
+function getGradeSpecificRecommendations(grade) {
+  const recommendations = [];
+  
+  switch (grade) {
+    case 'A+':
+      recommendations.push('이미지 품질이 매우 우수합니다. 미세한 조정만 권장합니다.');
+      break;
+    case 'A':
+      recommendations.push('이미지 품질이 우수합니다. 소폭의 개선만 권장합니다.');
+      break;
+    case 'B+':
+      recommendations.push('이미지 품질이 양호합니다. 중간 수준의 보정을 권장합니다.');
+      break;
+    case 'B':
+      recommendations.push('이미지 품질이 보통입니다. 적극적인 보정을 권장합니다.');
+      break;
+    case 'C':
+      recommendations.push('이미지 품질이 낮습니다. 강력한 보정이 필요합니다.');
+      break;
+  }
+  
+  return recommendations;
+}
+
+/**
+ * 우선순위 레벨 결정
+ */
+function getPriorityLevel(issueCount, technicalQuality) {
+  if (issueCount >= 4 || technicalQuality < 50) {
+    return 'HIGH';
+  } else if (issueCount >= 2 || technicalQuality < 70) {
+    return 'MEDIUM';
+  } else {
+    return 'LOW';
+  }
+}
 
 export default router;
