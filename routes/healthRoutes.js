@@ -29,6 +29,15 @@ const upload = multer({
  * 헬스체크
  * GET /api/health
  */
+/**
+ * @openapi
+ * /api/health:
+ *   get:
+ *     summary: 서비스 상태 확인
+ *     responses:
+ *       200:
+ *         description: 상태 정보
+ */
 router.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -44,6 +53,25 @@ router.get('/health', (req, res) => {
 /**
  * 이미지 분석 API
  * POST /api/analyze-image
+ */
+/**
+ * @openapi
+ * /api/analyze-image:
+ *   post:
+ *     summary: 이미지 종류/품질 분석
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: 분석 결과
  */
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
   try {
@@ -78,6 +106,25 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
 /**
  * 이미지 보정 API
  * POST /api/enhance-image
+ */
+/**
+ * @openapi
+ * /api/enhance-image:
+ *   post:
+ *     summary: 이미지 보정
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: 보정 결과
  */
 router.post('/enhance-image', upload.single('image'), async (req, res) => {
   try {
@@ -130,6 +177,26 @@ router.post('/enhance-image', upload.single('image'), async (req, res) => {
  * 이미지 타입별 보정 파라미터 조회 API
  * GET /api/enhancement-parameters/:imageType
  */
+/**
+ * @openapi
+ * /api/enhancement-parameters/{imageType}:
+ *   get:
+ *     summary: 이미지 타입별 보정 파라미터 조회
+ *     parameters:
+ *       - in: path
+ *         name: imageType
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: quality
+ *         schema:
+ *           type: string
+ *           description: encodeURIComponent(JSON)
+ *     responses:
+ *       200:
+ *         description: 파라미터 가이드
+ */
 router.get('/enhancement-parameters/:imageType', (req, res) => {
   try {
     const { imageType } = req.params;
@@ -179,6 +246,25 @@ router.get('/enhancement-parameters/:imageType', (req, res) => {
 /**
  * 이미지 품질 진단 API
  * POST /api/diagnose-image
+ */
+/**
+ * @openapi
+ * /api/diagnose-image:
+ *   post:
+ *     summary: 이미지 품질 진단 및 권장사항
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: 진단 결과 및 권장사항
  */
 router.post('/diagnose-image', upload.single('image'), async (req, res) => {
   try {

@@ -4,8 +4,40 @@ import { protect } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: 기본 로그인
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 로그인 성공
+ */
 // 기본 인증
 router.post('/login', login);
+
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     summary: 내 정보 조회
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 사용자 정보
+ */
 router.get('/me', protect, me);
 
 // 카카오 로그인 URL 생성 (프론트엔드용)
@@ -39,6 +71,20 @@ router.get('/kakao/auth-url', (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/kakao/callback:
+ *   get:
+ *     summary: 카카오 OAuth 콜백 (프론트 처리용 코드 확인)
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 인가 코드 수신
+ */
 // 카카오 OAuth 콜백 처리 (프론트엔드에서 처리)
 router.get('/kakao/callback', (req, res) => {
   try {
@@ -71,6 +117,24 @@ router.get('/kakao/callback', (req, res) => {
 });
 
 // 카카오 로그인 처리 (실제 API 연동)
+/**
+ * @openapi
+ * /api/auth/kakao/login:
+ *   post:
+ *     summary: 카카오 로그인 처리 (code 교환)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 애플리케이션 토큰 반환
+ */
 router.post('/kakao/login', kakaoLogin);
 
 // 네이버 로그인 URL (프론트엔드용)
@@ -90,6 +154,24 @@ router.get('/naver/auth-url', (req, res) => {
   res.json({ success: true, authUrl: url, redirectUri, state });
 });
 
+/**
+ * @openapi
+ * /api/auth/naver/callback:
+ *   get:
+ *     summary: 네이버 OAuth 콜백 (프론트 처리용 코드 확인)
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 인가 코드 수신
+ */
 // 네이버 콜백 (프론트엔드에서 처리)
 router.get('/naver/callback', (req, res) => {
   const { code, state } = req.query;
@@ -100,9 +182,36 @@ router.get('/naver/callback', (req, res) => {
 });
 
 // 네이버 로그인 처리 (실제 API 연동)
+/**
+ * @openapi
+ * /api/auth/naver/login:
+ *   post:
+ *     summary: 네이버 로그인 처리 (code 교환)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 애플리케이션 토큰 반환
+ */
 router.post('/naver/login', naverLogin);
 
 // 로그아웃
+/**
+ * @openapi
+ * /api/auth/logout:
+ *   post:
+ *     summary: 로그아웃
+ *     responses:
+ *       200:
+ *         description: 로그아웃 성공
+ */
 router.post('/logout', (req, res) => {
   res.json({
     success: true,

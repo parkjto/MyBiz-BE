@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 광고 자동 생성 시스템 테스트</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 30px; color: #2c3e50; }
+    .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 200px; }
+    label { display: block; margin-bottom: 8px; font-weight: 600; color: #2c3e50; }
+    input, select, textarea { width: 100%; padding: 12px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 14px; transition: border-color 0.3s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #3498db; }
+    button { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; }
+    button:hover { background: #2980b9; transform: translateY(-1px); }
+    button:disabled { background: #bdc3c7; cursor: not-allowed; transform: none; }
+    button.secondary { background: #95a5a6; }
+    button.secondary:hover { background: #7f8c8d; }
+    button.success { background: #27ae60; }
+    button.success:hover { background: #229954; }
+    .step-indicator { display: flex; justify-content: center; margin-bottom: 30px; }
+    .step { display: flex; align-items: center; margin: 0 20px; }
+    .step-number { width: 40px; height: 40px; border-radius: 50%; background: #e1e8ed; color: #7f8c8d; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; }
+    .step-number.active { background: #3498db; color: white; }
+    .step-number.completed { background: #27ae60; color: white; }
+    .step-label { font-weight: 600; color: #2c3e50; }
+    .preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 16px; }
+    .preset-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; cursor: pointer; transition: all 0.3s; }
+    .preset-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .preset-card.selected { border: 3px solid #f1c40f; }
+    .preset-title { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+    .preset-desc { font-size: 14px; opacity: 0.9; }
+    .preset-colors { display: flex; gap: 8px; margin-top: 12px; }
+    .color-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); }
+    .result-section { margin-top: 20px; }
+    .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .result-card { background: #f8f9fa; border-radius: 8px; padding: 16px; border-left: 4px solid #3498db; }
+    .result-title { font-weight: bold; margin-bottom: 8px; color: #2c3e50; }
+    .result-content { background: white; padding: 12px; border-radius: 6px; border: 1px solid #e1e8ed; }
+    .image-preview { max-width: 100%; height: auto; border-radius: 8px; margin-top: 12px; }
+    .loading { text-align: center; padding: 40px; color: #7f8c8d; }
+    .error { background: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-top: 12px; border-left: 4px solid #f44336; }
+    .success { background: #e8f5e8; color: #2e7d32; padding: 12px; border-radius: 6px; margin-top: 12px; border-left: 4px solid #4caf50; }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .comparison-item { background: white; padding: 16px; border-radius: 8px; border: 1px solid #e1e8ed; }
+    .comparison-label { font-weight: bold; margin-bottom: 8px; color: #2c3e50; }
+    .download-btn { background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-top: 8px; }
+    .download-btn:hover { background: #229954; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 AI 광고 자동 생성 시스템</h1>
+    
+    <!-- 단계별 진행 표시 -->
+    <div class="step-indicator">
+      <div class="step">
+        <div class="step-number active" id="step1">1</div>
+        <div class="step-label">이미지 업로드 & 분석</div>
+      </div>
+      <div class="step">
+        <div class="step-number" id="step2">2</div>
+        <div class="step-label">광고 목적 선택</div>
+      </div>
+      <div class="step">
+        <div class="step-number" id="step3">3</div>
+        <div class="step-label">AI 광고 생성</div>
+      </div>
+    </div>
+
+    <!-- 1단계: 이미지 업로드 및 분석 -->
+    <div class="card">
+      <h3>📸 1단계: 이미지 업로드 및 AI 분석</h3>
+      <div class="row">
+        <div class="col">
+          <label>이미지 파일</label>
+          <input type="file" id="imageFile" accept="image/*" />
+        </div>
+        <div class="col">
+          <label>서버 주소</label>
+          <input id="serverUrl" value="http://localhost:3000" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <button id="btnAnalyze" class="success">🔍 AI 이미지 분석 시작</button>
+        </div>
+      </div>
+      
+      <!-- 분석 결과 표시 -->
+      <div id="analysisResult" style="display: none;">
+        <div class="result-section">
+          <h4>📊 AI 분석 결과</h4>
+          <div class="result-grid">
+            <div class="result-card">
+              <div class="result-title">주요 피사체</div>
+              <div class="result-content" id="mainSubject">-</div>
+            </div>
+            <div class="result-card">
+              <div class="result-title">시각적 스타일</div>
+              <div class="result-content" id="visualStyle">-</div>
+            </div>
+            <div class="result-card">
+              <div class="result-title">색상 팔레트</div>
+              <div class="result-content" id="colorPalette">-</div>
+            </div>
+            <div class="result-card">
+              <div class="result-title">분위기</div>
+              <div class="result-content" id="moodAtmosphere">-</div>
+            </div>
+          </div>
+          
+          <div class="result-section">
+            <h4>💡 AI 추천사항</h4>
+            <div class="result-grid">
+              <div class="result-card">
+                <div class="result-title">추천 광고 목적</div>
+                <div class="result-content" id="recommendedPurposes">-</div>
+              </div>
+              <div class="result-card">
+                <div class="result-title">디자인 팁</div>
+                <div class="result-content" id="designTips">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2단계: 광고 목적 선택 -->
+    <div class="card" id="purposeSelectionCard" style="display: none;">
+      <h3>🎯 2단계: 광고 목적 선택</h3>
+      <div class="row">
+        <div class="col">
+          <label>브랜드명 *</label>
+          <input id="brandName" placeholder="My Brand" />
+        </div>
+        <div class="col">
+          <label>주요 상품/서비스 *</label>
+          <input id="mainProduct" placeholder="핵심 제품명" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>현재 슬로건</label>
+          <input id="slogan" placeholder="기존 슬로건 (선택사항)" />
+          <small style="color: #666; font-size: 12px;">💡 슬로건을 입력하면 AI가 더 매력적으로 개선합니다. 비워두면 AI가 새로 생성합니다.</small>
+        </div>
+        <div class="col">
+          <label>연락처 정보</label>
+          <input id="contactInfo" placeholder="전화번호, 웹사이트 등" />
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col">
+          <button id="btnLoadPurposes">📋 광고 목적 프리셋 불러오기</button>
+        </div>
+      </div>
+      
+      <!-- 광고 목적 프리셋 표시 -->
+      <div id="purposePresets" class="preset-grid" style="display: none;"></div>
+      
+      <div class="row" style="margin-top: 20px;">
+        <div class="col">
+          <div class="muted">선택된 광고 목적: <span id="selectedPurpose">-</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3단계: AI 광고 생성 -->
+    <div class="card" id="generationCard" style="display: none;">
+      <h3>🚀 3단계: AI 광고 생성</h3>
+      <div class="row">
+        <div class="col">
+          <button id="btnGenerateAd" class="success">🎨 AI 광고 생성 시작</button>
+        </div>
+      </div>
+      
+      <!-- 생성 결과 표시 -->
+      <div id="generationResult" style="display: none;">
+        <div class="result-section">
+          <h4>✨ AI 생성 결과</h4>
+          
+          <!-- 최적화된 텍스트 -->
+          <div class="result-section">
+            <h5>📝 최적화된 텍스트</h5>
+            <div class="comparison">
+              <div class="comparison-item">
+                <div class="comparison-label">원본</div>
+                <div id="originalText">-</div>
+              </div>
+              <div class="comparison-item">
+                <div class="comparison-label">AI 최적화</div>
+                <div id="optimizedText">-</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Sharp.js 텍스트 오버레이 포스터 -->
+          <div class="result-section">
+            <h5>🎨 Sharp.js 텍스트 오버레이 포스터</h5>
+            <div class="result-card">
+              <div class="result-title">✨ Sharp.js로 원본 이미지 + 텍스트 오버레이 포스터</div>
+              <div class="result-content">
+                <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 16px;">
+                  <p><strong>🎯 원본 이미지 100% 유지 + 전문적인 텍스트 오버레이</strong></p>
+                  <p>사용자가 업로드한 사진을 그대로 사용하여 텍스트를 정확한 위치에 배치</p>
+                  <p>투명한 아크릴 제품 → 투명한 아크릴 제품 + 텍스트로 완성</p>
+                </div>
+                <img id="sharpGeneratedPoster" class="image-preview" style="margin-top: 16px; display:none;" />
+              </div>
+              <button id="btnDownloadAd" class="download-btn">💾 다운로드</button>
+            </div>
+          </div>
+          
+          <!-- 생성 요약 -->
+          <div class="result-section">
+            <h5>📊 생성 요약</h5>
+            <div class="result-grid">
+              <div class="result-card">
+                <div class="result-title">광고 목적</div>
+                <div class="result-content" id="summaryPurpose">-</div>
+              </div>
+              <div class="result-card">
+                <div class="result-title">디자인 스타일</div>
+                <div class="result-content" id="summaryStyle">-</div>
+              </div>
+              <div class="result-card">
+                <div class="result-title">타겟 감정</div>
+                <div class="result-content" id="summaryEmotion">-</div>
+              </div>
+              <div class="result-card">
+                <div class="result-title">생성 시간</div>
+                <div class="result-content" id="summaryTime">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let selectedPurpose = null;
+    let imageAnalysis = null;
+    let generationStartTime = null;
+
+    // 페이지 로드 시 서버 자동 감지
+    document.addEventListener('DOMContentLoaded', async () => {
+      try { 
+        $('serverUrl').value = location.origin; 
+      } catch {}
+      
+      // 서버 자동 감지
+      const portsToTry = [location.port, '3000', '4000', '8080'];
+      for (const port of portsToTry) {
+        if (!port) continue;
+        const testUrl = `${location.protocol}//${location.hostname}:${port}`;
+        try {
+          const response = await fetch(`${testUrl}/health`);
+          if (response.ok) {
+            $('serverUrl').value = testUrl;
+            console.log(`Server detected at: ${testUrl}`);
+            break;
+          }
+        } catch (e) {
+          // console.warn(`Health check failed for ${testUrl}:`, e);
+        }
+      }
+    });
+
+    // 1단계: 이미지 분석
+    $('btnAnalyze').onclick = async () => {
+      const file = $('imageFile').files[0];
+      if (!file) {
+        alert('이미지 파일을 선택해주세요.');
+        return;
+      }
+
+      $('btnAnalyze').disabled = true;
+      $('btnAnalyze').textContent = '분석 중...';
+
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch(`${$('serverUrl').value}/api/ad-generation/analyze-image`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          imageAnalysis = data.analysis;
+          displayAnalysisResult(data);
+          showStep(2);
+          $('purposeSelectionCard').style.display = 'block';
+        } else {
+          throw new Error(data.message || '분석 실패');
+        }
+      } catch (error) {
+        showError('이미지 분석 실패: ' + error.message);
+      } finally {
+        $('btnAnalyze').disabled = false;
+        $('btnAnalyze').textContent = '🔍 AI 이미지 분석 시작';
+      }
+    };
+
+    // 분석 결과 표시
+    function displayAnalysisResult(data) {
+      const { analysis, suggestions } = data;
+      
+      $('mainSubject').textContent = analysis.main_subject || '-';
+      $('visualStyle').textContent = analysis.visual_style || '-';
+      $('colorPalette').textContent = analysis.color_palette?.join(', ') || '-';
+      $('moodAtmosphere').textContent = analysis.mood_atmosphere || '-';
+      
+      $('recommendedPurposes').textContent = suggestions.recommended_purposes?.join(', ') || '-';
+      $('designTips').innerHTML = suggestions.design_tips?.map(tip => `• ${tip}`).join('<br>') || '-';
+      
+      $('analysisResult').style.display = 'block';
+    }
+
+    // 2단계: 광고 목적 프리셋 로드
+    $('btnLoadPurposes').onclick = async () => {
+      $('btnLoadPurposes').disabled = true;
+      $('btnLoadPurposes').textContent = '로딩 중...';
+
+      try {
+        const response = await fetch(`${$('serverUrl').value}/api/ad-generation/purpose-presets`);
+        const data = await response.json();
+        
+        if (data.success) {
+          displayPurposePresets(data.presets);
+        } else {
+          throw new Error(data.message || '프리셋 로드 실패');
+        }
+      } catch (error) {
+        showError('프리셋 로드 실패: ' + error.message);
+      } finally {
+        $('btnLoadPurposes').disabled = false;
+        $('btnLoadPurposes').textContent = '📋 광고 목적 프리셋 불러오기';
+      }
+    };
+
+    // 광고 목적 프리셋 표시
+    function displayPurposePresets(presets) {
+      const container = $('purposePresets');
+      container.innerHTML = '';
+      
+      presets.forEach(preset => {
+        const card = document.createElement('div');
+        card.className = 'preset-card';
+        card.onclick = () => selectPurpose(preset);
+        
+        card.innerHTML = `
+          <div class="preset-title">${preset.label}</div>
+          <div class="preset-desc">${preset.description}</div>
+          <div class="preset-colors">
+            ${preset.colors.map(color => `<div class="color-dot" style="background: ${color}"></div>`).join('')}
+          </div>
+        `;
+        
+        container.appendChild(card);
+      });
+      
+      container.style.display = 'grid';
+    };
+
+    // 광고 목적 선택
+    function selectPurpose(preset) {
+      selectedPurpose = preset;
+      
+      // 선택 표시 업데이트
+      document.querySelectorAll('.preset-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      event.currentTarget.classList.add('selected');
+      
+      $('selectedPurpose').textContent = preset.label;
+      
+      // 3단계 표시
+      showStep(3);
+      $('generationCard').style.display = 'block';
+    };
+
+    // 3단계: AI 광고 생성
+    $('btnGenerateAd').onclick = async () => {
+      if (!selectedPurpose) {
+        alert('광고 목적을 선택해주세요.');
+        return;
+      }
+
+      // 🚫 사용자 입력 절대 검증
+      const brandName = $('brandName').value.trim();
+      const mainProduct = $('mainProduct').value.trim();
+      const slogan = $('slogan').value.trim();
+      const contactInfo = $('contactInfo').value.trim();
+
+      // 필수 입력 검증
+      if (!brandName) {
+        alert('🚫 브랜드명은 필수입니다!');
+        $('brandName').focus();
+        return;
+      }
+      if (!mainProduct) {
+        alert('🚫 주요 상품/서비스는 필수입니다!');
+        $('mainProduct').focus();
+        return;
+      }
+
+      const userInputs = {
+        brand_name: brandName,
+        main_product: mainProduct,
+        slogan: slogan,
+        contact_info: contactInfo
+      };
+
+      // 🚫 사용자 입력 절대 확인 (AI 임의 생성 금지)
+      const confirmMessage = `🚫 AI 임의 생성 금지 확인!\n\n입력된 정보:\n브랜드: "${brandName}"\n상품: "${mainProduct}"\n슬로건: "${slogan || '없음'}"\n\n이 정보로 정확히 진행하시겠습니까?`;
+      
+      if (!confirm(confirmMessage)) {
+        alert('사용자 입력을 확인하고 다시 시도해주세요.');
+        return;
+      }
+
+      console.log('🚫 사용자 입력 절대 확인:', userInputs);
+
+      $('btnGenerateAd').disabled = true;
+      $('btnGenerateAd').textContent = '생성 중...';
+      generationStartTime = new Date();
+
+      try {
+        const formData = new FormData();
+        formData.append('image', $('imageFile').files[0]);
+        formData.append('ad_purpose', selectedPurpose.key);
+        formData.append('user_inputs', JSON.stringify(userInputs));
+        // 기본값: blur 비활성, gradient 비활성 (사진 식별성 유지)
+        formData.append('effects', JSON.stringify({ blur: false, gradient: false }));
+
+        const response = await fetch(`${$('serverUrl').value}/api/ad-generation/generate-complete`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          displayGenerationResult(data);
+        } else {
+          throw new Error(data.message || '광고 생성 실패');
+        }
+      } catch (error) {
+        showError('광고 생성 실패: ' + error.message);
+      } finally {
+        $('btnGenerateAd').disabled = false;
+        $('btnGenerateAd').textContent = '🎨 AI 광고 생성 시작';
+      }
+    };
+
+    // 생성 결과 표시
+    function displayGenerationResult(data) {
+      const { result, summary } = data;
+      
+      // 🚫 사용자 입력 절대 보존 확인
+      $('originalText').innerHTML = `
+        <strong>브랜드:</strong> ${result.optimized_text.optimized_brand}<br>
+        <strong>상품:</strong> ${result.optimized_text.main_product || '사용자 입력'}<br>
+        <strong>슬로건:</strong> ${result.optimized_text.optimized_slogan}
+      `;
+      
+      // ✅ 슬로건 AI 개선 결과 표시
+      const sloganStatus = result.optimized_text.optimized_slogan ? '✅ AI 개선됨' : '❌ 생성 실패';
+      
+      $('optimizedText').innerHTML = `
+        <strong>브랜드:</strong> ${result.optimized_text.optimized_brand}<br>
+        <strong>상품:</strong> ${result.optimized_text.main_product || '사용자 입력'}<br>
+        <strong>슬로건:</strong> ${result.optimized_text.optimized_slogan} <span style="color: #27ae60; font-size: 12px;">${sloganStatus}</span><br>
+        <strong>행동 유도:</strong> ${result.optimized_text.call_to_action}<br>
+        <strong>감정적 훅:</strong> ${result.optimized_text.emotional_hook}
+      `;
+      
+      // 🎨 Sharp.js가 생성한 포스터 이미지 표시
+      const sharpGeneratedPosterElement = $('sharpGeneratedPoster');
+      if (result.poster_url) {
+        sharpGeneratedPosterElement.src = result.poster_url;
+        sharpGeneratedPosterElement.style.display = 'block';
+        console.log('🎨 Sharp.js 포스터 이미지 표시:', result.poster_url);
+      } else {
+        console.error('❌ Sharp.js 포스터 이미지 URL 없음');
+        sharpGeneratedPosterElement.style.display = 'none';
+      }
+      
+      // 📊 생성 요약 정보 표시
+      if (result.design && result.design.metadata) {
+        $('summaryPurpose').textContent = result.ad_purpose || '-';
+        $('summaryStyle').textContent = result.design.metadata.style || '-';
+        $('summaryEmotion').textContent = result.design.metadata.emotion || '-';
+      }
+      
+      if (generationStartTime) {
+        const endTime = new Date();
+        const duration = Math.round((endTime - generationStartTime) / 1000);
+        $('summaryTime').textContent = `${duration}초`;
+      }
+      
+      // 결과 섹션 표시
+      $('generationResult').style.display = 'block';
+      $('generationResult').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // 다운로드 버튼
+    $('btnDownloadAd').onclick = () => {
+      const sharpGeneratedPosterElement = $('sharpGeneratedPoster');
+      
+      if (sharpGeneratedPosterElement && sharpGeneratedPosterElement.src && sharpGeneratedPosterElement.src.startsWith('http')) {
+        // Sharp.js 포스터 이미지 URL을 다운로드
+        const imageUrl = sharpGeneratedPosterElement.src;
+        const imageName = `sharp-poster-${Date.now()}.png`;
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = imageName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (sharpGeneratedPosterElement && sharpGeneratedPosterElement.src && sharpGeneratedPosterElement.src.startsWith('data:')) {
+        // Base64 이미지 다운로드
+        const link = document.createElement('a');
+        link.href = sharpGeneratedPosterElement.src;
+        link.download = `sharp-poster-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('다운로드할 이미지가 없습니다.');
+      }
+    };
+
+    // 단계 표시 업데이트
+    function showStep(stepNumber) {
+      for (let i = 1; i <= 3; i++) {
+        const stepElement = $(`step${i}`);
+        if (i < stepNumber) {
+          stepElement.className = 'step-number completed';
+        } else if (i === stepNumber) {
+          stepElement.className = 'step-number active';
+        } else {
+          stepElement.className = 'step-number';
+        }
+      }
+    }
+
+    // 에러 표시
+    function showError(message) {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error';
+      errorDiv.textContent = message;
+      
+      // 기존 에러 제거
+      document.querySelectorAll('.error').forEach(el => el.remove());
+      
+      // 새 에러 추가
+      document.querySelector('.container').appendChild(errorDiv);
+      
+      // 3초 후 자동 제거
+      setTimeout(() => errorDiv.remove(), 3000);
+    }
+  </script>
+</body>
+</html>
