@@ -15,6 +15,7 @@ import salesRoutes from './routes/salesRoutes.js';
 import adRoutes from './routes/adRoutes.js';
 import posterRoutes from './routes/posterRoutes.js';
 import adGenerationRoutes from './routes/adGenerationRoutes.js';
+import chatbotRoutes from './routes/chatbotRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -24,6 +25,7 @@ import { logger } from './utils/logger.js';
 import naverSchedulerService from './services/naverSchedulerService.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { attachRealtimeSpeechServer } from './services/realtimeSpeechServer.js';
 
 dotenv.config();
 assertRequiredEnv();
@@ -99,6 +101,7 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/ad', adRoutes);
 app.use('/api/posters', posterRoutes);
 app.use('/api/ad-generation', adGenerationRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 app.use('/api', healthRoutes); // 헬스체크 및 이미지 분석 API
 
 // Swagger
@@ -113,7 +116,7 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`[서버] http://localhost:${PORT} 에서 실행 중`);
   logger.info(`[API] 텍스트 기반 광고: POST /api/ad/generate`);
   logger.info(`[API] 이미지 보정 전용: POST /api/ad/enhance-image`);
@@ -132,6 +135,7 @@ app.listen(PORT, () => {
   logger.info(`[API] 네이버 연동: /api/naver-credentials`);
   logger.info(`[API] 매출 관리: /api/sales`);
   logger.info(`[API] API 문서: /api-docs`);
+  logger.info(`[API] 챗봇: /api/chatbot`);
   logger.info(`[CORS] 개발환경: 모든 origin 허용, 프로덕션: ${process.env.ALLOWED_ORIGINS || '설정 필요'}`);
   
   // 네이버 야간 자동 실행 스케줄러 시작
@@ -142,6 +146,12 @@ app.listen(PORT, () => {
     logger.info('연결 상태 확인: 매시간 정각');
   } catch (error) {
     logger.error('네이버 스케줄러 시작 실패:', error);
+  }
+  // WebSocket Speech server attach
+  try {
+    attachRealtimeSpeechServer(server);
+  } catch (e) {
+    logger.error('WebSocket Speech 서버 시작 실패:', e?.message);
   }
 });
 export default app;
