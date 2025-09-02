@@ -1,0 +1,142 @@
+# 환경변수 파일들
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 로그 파일들
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 임시 파일들
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS 생성 파일들
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE/에디터 설정 파일들
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 백업 파일들
+*.bak
+*.backup
+*.old
+
+# 테스트 커버리지 및 결과
+coverage/
+.nyc_output/
+test-results/
+
+# 빌드 결과물
+dist/
+build/
+out/
+
+# 캐시 파일들
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Dependencies - 더 구체적인 설정
+node_modules/
+jspm_packages/
+bower_components/
+
+# npm 관련 파일들
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# package-lock 파일들 (선택사항 - 팀 정책에 따라)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Google credentials 및 API 키 파일들
+google-credentials/
+*.json
+credentials/
+secrets/
+keys/
+
+# Uploads and test files
+uploads/
+test-output/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# 보안 관련 파일들
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.p8
+
+# 데이터베이스 파일들
+*.db
+*.sqlite
+*.sqlite3
+
+# 임시 스크래핑 결과
+scraped_data/
+temp_data/
+cache_data/
+
+# 로컬 설정 파일들
+config/local.js
+config/local.json
+local.config.js
+
+# 추가 보안 파일들
+*.env
+*.secret
+*.private
+*.conf
+*.config
+*.cfg
+
+# 의존성 관련 추가 파일들
+.npmrc
+.yarnrc
+.yarnrc.yml
+.pnpmrc

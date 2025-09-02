@@ -1,21 +1,65 @@
 {
   "name": "mybiz-backend",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "prod": "NODE_ENV=production node index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google-cloud/speech": "^7.2.0",
+    "@supabase/supabase-js": "^2.56.0",
+    "axios": "^1.11.0",
+    "babel": "^6.23.0",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.0",
-    "express": "^5.1.0",
+    "crypto-js": "^4.2.0",
+    "csvtojson": "^2.0.10",
+    "delay": "^6.0.0",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.1",
+    "fast-levenshtein": "^3.0.0",
+    "form-data": "^4.0.4",
+    "helmet": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.3",
+    "multer": "^2.0.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "nodemon": "^3.1.10",
+    "openai": "^4.104.0",
+    "p-limit": "^3.1.0",
+    "puppeteer": "^23.7.0",
+    "semver": "^7.7.2",
+    "sharp": "^0.34.3",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^11.1.0",
+    "winston": "^3.13.0",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/tests/setup.js"
+    ]
   }
 }
