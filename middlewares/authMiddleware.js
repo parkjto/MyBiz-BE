@@ -14,3 +14,6 @@ export const protect = (req, res, next) => {
   }
 };
 
+// authMiddleware 별칭 추가
+export const authMiddleware = protect;
+

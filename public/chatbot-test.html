@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MyBiz 챗봇 테스트</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', 'Apple SD Gothic Neo', Arial, sans-serif; margin: 24px; background:#fafafa; color:#222 }
+    h1 { font-size: 20px; margin: 0 0 16px }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04) }
+    label { display:block; font-size:12px; color:#666; margin-bottom:6px }
+    input[type="text"], input[type="password"], textarea { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; outline:none; font-size:14px; background:#fff }
+    textarea { min-height: 80px }
+    .row { display:flex; gap:12px; flex-wrap: wrap }
+    .row .col { flex:1 1 240px }
+    .btn { appearance:none; border:1px solid #111827; background:#111827; color:#fff; border-radius:8px; padding:10px 14px; font-size:14px; cursor:pointer }
+    .btn.secondary { background:#fff; color:#111827 }
+    .btn:disabled { opacity:0.5; cursor:not-allowed }
+    .chips { display:flex; gap:8px; flex-wrap:wrap }
+    .chip { padding:8px 10px; border:1px solid #d1d5db; border-radius:20px; font-size:13px; cursor:pointer; background:#fff }
+    .chip:hover { background:#f3f4f6 }
+    pre { background:#0b1020; color:#f3f4f6; padding:12px; border-radius:8px; overflow:auto; max-height:50vh; font-size:12px }
+    .muted { color:#6b7280; font-size:12px }
+  </style>
+</head>
+<body>
+  <h1>🤖 MyBiz 챗봇 테스트</h1>
+
+  <div class="card">
+    <div class="row">
+      <div class="col">
+        <label>JWT 토큰 (Authorization: Bearer ...)</label>
+        <input id="token" type="password" placeholder="YOUR_JWT_TOKEN" />
+        <div class="muted">상태 조회는 토큰 불필요, 그 외 엔드포인트는 토큰 필요</div>
+      </div>
+      <div class="col">
+        <label>userId</label>
+        <input id="userId" type="text" placeholder="예: test_user_123" value="test_user" />
+      </div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px">
+      <button class="btn secondary" id="saveToken">토큰 저장</button>
+      <button class="btn secondary" id="clearToken">토큰 지우기</button>
+      <span class="muted" id="tokenStatus"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="col">
+        <label>텍스트 메시지</label>
+        <textarea id="message" placeholder="예: 매출 분석을 보여주세요"></textarea>
+      </div>
+    </div>
+    <div class="chips" style="margin:10px 0 6px">
+      <span class="chip" data-msg="매출 분석을 보여주세요">매출 분석</span>
+      <span class="chip" data-msg="리뷰 상황을 확인해줘">리뷰 분석</span>
+      <span class="chip" data-msg="매출을 올리는 방법을 알려줘">매출 개선 방안</span>
+      <span class="chip" data-msg="광고를 만들어줘">광고 생성</span>
+      <span class="chip" data-msg="안녕하세요">일반 대화</span>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="btn" id="callStatus">상태 조회 (GET /api/chatbot/status)</button>
+      <button class="btn" id="callTestIntent">의도 분류 (POST /api/chatbot/test-intent)</button>
+      <button class="btn" id="callMessage">메시지 처리 (POST /api/chatbot/message)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>음성 파일 업로드 (선택)</label>
+    <input id="audioFile" type="file" accept="audio/*" />
+    <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
+      <button class="btn" id="callVoice">음성 명령 (POST /api/chatbot/voice)</button>
+      <button class="btn secondary" id="wsStart">실시간 음성 시작(WebSocket)</button>
+      <button class="btn secondary" id="wsStop">중지</button>
+      <span class="muted">mp3/wav 업로드 또는 마이크 실시간 전송</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <strong>응답</strong>
+      <span class="muted" id="navHint"></span>
+    </div>
+    <pre id="output">응답이 여기에 표시됩니다.</pre>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+
+    // 로컬 저장된 토큰 복구
+    const tokenInput = $('#token');
+    const tokenStatus = $('#tokenStatus');
+    const saved = localStorage.getItem('chatbot_token');
+    if (saved) {
+      tokenInput.value = saved;
+      tokenStatus.textContent = '저장된 토큰 사용 중';
+    }
+
+    $('#saveToken').addEventListener('click', () => {
+      const cleaned = tokenInput.value.replace(/\s+/g, '').trim();
+      tokenInput.value = cleaned;
+      localStorage.setItem('chatbot_token', cleaned);
+      tokenStatus.textContent = `토큰 저장됨 (len: ${cleaned.length})`;
+    });
+    $('#clearToken').addEventListener('click', () => {
+      localStorage.removeItem('chatbot_token');
+      tokenInput.value = '';
+      tokenStatus.textContent = '토큰 삭제됨';
+    });
+
+    // 빠른 문구 채우기
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        $('#message').value = chip.dataset.msg;
+      });
+    });
+
+    const setOutput = (obj) => {
+      $('#output').textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+    };
+
+    const showNavHint = (resp) => {
+      const hint = $('#navHint');
+      if (resp && resp.data && resp.data.type === 'navigation') {
+        hint.textContent = `화면 이동: ${resp.data.screen}`;
+      } else if (resp && resp.type === 'navigation') {
+        hint.textContent = `화면 이동: ${resp.screen}`;
+      } else {
+        hint.textContent = '';
+      }
+    };
+
+    const buildHeaders = (needAuth = false) => {
+      const headers = { 'Content-Type': 'application/json' };
+      const t = tokenInput.value.replace(/\s+/g, '').trim();
+      if (needAuth && t) headers['Authorization'] = `Bearer ${t}`;
+      return headers;
+    };
+
+    // 1) 상태 조회
+    $('#callStatus').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/chatbot/status');
+        const data = await res.json();
+        setOutput(data);
+        showNavHint(data);
+      } catch (e) {
+        console.error('[callStatus] error', e);
+        setOutput({ error: e.message });
+      }
+    });
+
+    // 2) 의도 분류
+    $('#callTestIntent').addEventListener('click', async () => {
+      const text = $('#message').value.trim();
+      if (!text) return setOutput('텍스트를 입력하세요.');
+      try {
+        const res = await fetch('/api/chatbot/test-intent', {
+          method: 'POST',
+          headers: buildHeaders(true),
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        setOutput(data);
+        showNavHint(data);
+      } catch (e) {
+        console.error('[callTestIntent] error', e);
+        setOutput({ error: e.message });
+      }
+    });
+
+    // 3) 메시지 처리
+    $('#callMessage').addEventListener('click', async () => {
+      const text = $('#message').value.trim();
+      const userId = $('#userId').value.trim() || 'test_user';
+      if (!text) return setOutput('텍스트를 입력하세요.');
+      try {
+        const res = await fetch('/api/chatbot/message', {
+          method: 'POST',
+          headers: buildHeaders(true),
+          body: JSON.stringify({ text, userId })
+        });
+        const data = await res.json();
+        setOutput(data);
+        showNavHint(data);
+      } catch (e) {
+        console.error('[callMessage] error', e);
+        setOutput({ error: e.message });
+      }
+    });
+
+    // 4) 음성 명령 (파일 => base64)
+    const fileToBase64 = (file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    $('#callVoice').addEventListener('click', async () => {
+      const f = $('#audioFile').files[0];
+      const userId = $('#userId').value.trim() || 'test_user';
+      if (!f) return setOutput('오디오 파일을 선택하세요.');
+      try {
+        const base64 = await fileToBase64(f);
+        const res = await fetch('/api/chatbot/voice', {
+          method: 'POST',
+          headers: buildHeaders(true),
+          body: JSON.stringify({ audioBuffer: base64, userId })
+        });
+        const data = await res.json();
+        setOutput(data);
+        showNavHint(data);
+      } catch (e) {
+        console.error('[callVoice] error', e);
+        setOutput({ error: e.message });
+      }
+    });
+  </script>
+  <script>
+    // 실시간 음성(WebSocket + MediaRecorder)
+    let ws = null;
+    let mediaRecorder = null;
+    let wsReady = false;
+
+    function connectWs() {
+      return new Promise((resolve, reject) => {
+        ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/speech');
+        ws.onopen = () => { console.log('[WS] open'); resolve(); };
+        ws.onerror = (e) => { console.error('[WS] error', e); reject(e); };
+        ws.onclose = (e) => { console.warn('[WS] close', e?.code, e?.reason); };
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg.type === 'ready') wsReady = true;
+            if (msg.type === 'partial') setOutput({ partial: msg.text });
+            if (msg.type === 'final') setOutput({ final: msg.text });
+            if (msg.type === 'chatbot') { console.log('[WS] chatbot', msg.data); setOutput({ chatbot: msg.data }); showNavHint(msg.data); }
+            if (msg.type === 'error') { console.error('[WS] server error', msg.message); setOutput({ error: msg.message }); }
+          } catch {}
+        };
+      });
+    }
+
+    async function startRealtime() {
+      try {
+        await connectWs();
+        const token = document.querySelector('#token').value.replace(/\s+/g, '').trim();
+        // 브라우저가 지원하는 코덱 자동 협상
+        const candidates = [
+          'audio/ogg;codecs=opus',
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/mp4',
+          ''
+        ];
+        let selectedMime = '';
+        for (const cand of candidates) {
+          if (!cand || (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cand))) {
+            selectedMime = cand;
+            break;
+          }
+        }
+        if (!selectedMime) selectedMime = '';
+        console.log('[Media] selected mime', selectedMime || '(browser default)');
+
+        ws.send(JSON.stringify({ type: 'start', token, userId: document.querySelector('#userId').value.trim() || 'test_user', language: 'ko-KR', mime: selectedMime || 'audio/webm' }));
+
+        // 마이크 권장 옵션(반향 제거/소음 억제)
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } }).catch(err => { console.error('[Media] getUserMedia error', err); throw err; });
+        mediaRecorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
+        mediaRecorder.onstart = () => console.log('[Media] recorder start');
+        mediaRecorder.onstop = () => console.log('[Media] recorder stop');
+        mediaRecorder.onerror = (e) => console.error('[Media] recorder error', e);
+        mediaRecorder.ondataavailable = async (e) => {
+          if (e.data && e.data.size > 0 && ws && ws.readyState === 1) {
+            const buf = await e.data.arrayBuffer();
+            const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+            console.log('[Media] chunk bytes', buf.byteLength);
+            ws.send(JSON.stringify({ type: 'audio', chunk: b64 }));
+          }
+        };
+        mediaRecorder.start(250); // 더 빠른 부분 인식
+      } catch (e) { setOutput({ error: '마이크 시작 실패: ' + (e?.message || e) }); }
+    }
+
+    async function stopRealtime() {
+      try {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'stop' }));
+        if (ws) ws.close();
+        ws = null; mediaRecorder = null; wsReady = false;
+      } catch {}
+    }
+
+    document.querySelector('#wsStart').addEventListener('click', startRealtime);
+    document.querySelector('#wsStop').addEventListener('click', stopRealtime);
+
+    // 전역 오류 로깅
+    window.addEventListener('error', (e) => {
+      console.error('[Global] error', e?.error || e?.message || e);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('[Global] unhandledrejection', e?.reason || e);
+    });
+  </script>
+</body>
+</html>
