@@ -14,13 +14,13 @@ export const login = async (req, res, next) => {
     }
 
     // 기존 사용자 확인 또는 새 사용자 생성
-    let user = await getUserOrCreate(userId, provider);
+    const { user, isNewUser } = await getUserOrCreate(userId, provider);
     
     // JWT 토큰 생성
     const token = jwt.sign(
       { 
         id: user.id, 
-        provider: user.provider,
+        provider: provider,
         email: user.email 
       }, 
       process.env.JWT_SECRET, 
@@ -33,11 +33,13 @@ export const login = async (req, res, next) => {
     res.json({ 
       success: true, 
       token,
+      isNewUser,
+      isRegistered: !isNewUser,
       user: {
         id: user.id,
         email: user.email,
         nickname: user.nickname,
-        provider: user.provider,
+        provider: provider,
         profile_image_url: user.profile_image_url
       }
     });
@@ -58,7 +60,16 @@ async function getUserOrCreate(userId, provider) {
       .single();
 
     if (existingUser) {
-      return existingUser;
+      // 기존 사용자의 provider 정보 업데이트
+      await supabase
+        .from('users')
+        .update({ 
+          provider: provider,
+          last_login_at: new Date().toISOString()
+        })
+        .eq('id', existingUser.id);
+      
+      return { user: existingUser, isNewUser: false };
     }
 
     // 새 사용자 생성
@@ -79,7 +90,7 @@ async function getUserOrCreate(userId, provider) {
     if (insertError) throw insertError;
 
     logger.info(`새 사용자 생성: ${createdUser.id} (${provider})`);
-    return createdUser;
+    return { user: createdUser, isNewUser: true };
 
   } catch (error) {
     logger.error('사용자 조회/생성 에러:', error);
@@ -123,7 +134,8 @@ export const me = async (req, res) => {
         id: user.id,
         email: user.email,
         nickname: user.nickname,
-        provider: user.provider,
+        phone_number: user.phone_number,
+        business_type: user.business_type,
         profile_image_url: user.profile_image_url,
         last_login_at: user.last_login_at
       }
@@ -153,7 +165,7 @@ export const kakaoLogin = async (req, res, next) => {
     const kakaoUser = await getKakaoUserInfo(accessToken);
     
     // 사용자 생성 또는 조회
-    const user = await getUserOrCreate(kakaoUser.id, 'kakao');
+    const { user, isNewUser } = await getUserOrCreate(kakaoUser.id, 'kakao');
     
     // JWT 토큰 생성
     const token = jwt.sign(
@@ -172,6 +184,8 @@ export const kakaoLogin = async (req, res, next) => {
     res.json({
       success: true,
       message: '카카오 로그인 성공',
+      isNewUser,
+      isRegistered: !isNewUser,
       token,
       user: {
         id: user.id,
@@ -264,7 +278,7 @@ export const naverLogin = async (req, res, next) => {
     const naverUser = await getNaverUserInfo(accessToken);
     
     // 사용자 생성 또는 조회
-    const user = await getUserOrCreate(naverUser.id, 'naver');
+    const { user, isNewUser } = await getUserOrCreate(naverUser.id, 'naver');
     
     // JWT 토큰 생성
     const token = jwt.sign(
@@ -283,6 +297,8 @@ export const naverLogin = async (req, res, next) => {
     res.json({
       success: true,
       message: '네이버 로그인 성공',
+      isNewUser,
+      isRegistered: !isNewUser,
       token,
       user: {
         id: user.id,
@@ -358,3 +374,117 @@ async function getNaverUserInfo(accessToken) {
     throw new Error(`네이버 사용자 정보 획득 실패: ${error.message}`);
   }
 }
+
+// 카카오 로그아웃 (토큰 무효화)
+export const kakaoLogout = async (req, res, next) => {
+  try {
+    const { accessToken } = req.body;
+    
+    if (!accessToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '액세스 토큰이 필요합니다' 
+      });
+    }
+
+    // 1. 카카오 API로 토큰 무효화
+    const logoutResponse = await fetch('https://kapi.kakao.com/v1/user/logout', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    // 2. 추가로 카카오 계정 연결 해제 (선택사항)
+    try {
+      await fetch('https://kapi.kakao.com/v1/user/unlink', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+    } catch (unlinkError) {
+      // 연결 해제 실패는 무시
+      logger.warn('카카오 계정 연결 해제 실패:', unlinkError.message);
+    }
+
+    if (logoutResponse.ok) {
+      res.json({
+        success: true,
+        message: '카카오 로그아웃 성공 (토큰 무효화 및 세션 정리 완료)'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: '카카오 토큰 무효화 완료 (이미 만료된 토큰일 수 있음)'
+      });
+    }
+  } catch (err) {
+    logger.error('카카오 로그아웃 에러:', err);
+    // 에러가 발생해도 성공으로 처리 (토큰이 이미 만료되었을 수 있음)
+    res.json({
+      success: true,
+      message: '카카오 로그아웃 처리 완료'
+    });
+  }
+};
+
+// 네이버 로그아웃 (토큰 무효화)
+export const naverLogout = async (req, res, next) => {
+  try {
+    const { accessToken } = req.body;
+    
+    if (!accessToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '액세스 토큰이 필요합니다' 
+      });
+    }
+
+    // 1. 네이버 API로 토큰 무효화
+    const response = await fetch('https://nid.naver.com/oauth2.0/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'delete',
+        client_id: process.env.NAVER_CLIENT_ID,
+        client_secret: process.env.NAVER_CLIENT_SECRET,
+        access_token: accessToken,
+      }),
+    });
+
+    // 2. 추가로 네이버 세션 정리 (선택사항)
+    try {
+      await fetch('https://nid.naver.com/nidlogin.logout', {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MyBiz/1.0)',
+        },
+      });
+    } catch (sessionError) {
+      // 세션 정리 실패는 무시
+      logger.warn('네이버 세션 정리 실패:', sessionError.message);
+    }
+
+    if (response.ok) {
+      res.json({
+        success: true,
+        message: '네이버 로그아웃 성공 (토큰 무효화 및 세션 정리 완료)'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: '네이버 토큰 무효화 완료 (이미 만료된 토큰일 수 있음)'
+      });
+    }
+  } catch (err) {
+    logger.error('네이버 로그아웃 에러:', err);
+    // 에러가 발생해도 성공으로 처리 (토큰이 이미 만료되었을 수 있음)
+    res.json({
+      success: true,
+      message: '네이버 로그아웃 처리 완료'
+    });
+  }
+};

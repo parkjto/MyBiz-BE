@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import delay from 'delay';
 import { getNaverSession } from './sessionService.js';
+import { autoLoginToNaver } from './naverAutoLoginService.js';
 import { logger } from '../utils/logger.js';
 import { SmartClickService } from './smartClickService.js';
 
@@ -14,27 +15,43 @@ export const navigateToReviewPage = async (userStoreId) => {
     const page = await browser.newPage();
     
     // 1. 저장된 세션 정보 로드
-    const sessionData = await getNaverSession(userStoreId);
+    let sessionData = await getNaverSession(userStoreId);
+    
+    // 2. 세션이 없으면 자동 로그인 시도
     if (!sessionData) {
-      throw new Error('저장된 네이버 세션이 없습니다');
+      logger.info('🔄 저장된 세션이 없습니다. 자동 로그인 시도...');
+      
+      try {
+        await autoLoginToNaver(userStoreId);
+        sessionData = await getNaverSession(userStoreId);
+        
+        if (!sessionData) {
+          throw new Error('자동 로그인 후에도 세션을 가져올 수 없습니다');
+        }
+        
+        logger.info('✅ 자동 로그인 성공, 세션 복원 완료');
+      } catch (loginError) {
+        logger.error('❌ 자동 로그인 실패:', loginError.message);
+        throw new Error(`자동 로그인 실패: ${loginError.message}`);
+      }
     }
 
-    // 2. 세션 쿠키 복원
+    // 3. 세션 쿠키 복원
     await page.setCookie(...sessionData.cookies);
-    logger.info('🍪 세션 쿠키 복원 완료');
+    logger.info('세션 쿠키 복원 완료');
 
-    // 3. User-Agent 설정
+    // 4. User-Agent 설정
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-    // 4. 네이버 스마트플레이스 메인으로 이동
-    logger.info('🌐 네이버 스마트플레이스 메인 접속 중...');
+    // 5. 네이버 스마트플레이스 메인으로 이동
+    logger.info('네이버 스마트플레이스 메인 접속 중...');
     await page.goto('https://new.smartplace.naver.com/', {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
 
     // 5. 로그인 상태 확인
-    logger.info('�� 로그인 상태 확인 중...');
+    logger.info('로그인 상태 확인 중...');
     
     // 페이지 로딩 대기
     await delay(3000);
