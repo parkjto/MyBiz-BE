@@ -1,5 +1,5 @@
-import { supabase } from './supabaseService.js';
-import { encrypt, decrypt } from '../utils/encryption.js';
+import { supabase } from '../utils/supabaseClient.js';
+// import { encrypt, decrypt } from '../utils/encryption.js';
 import { logger } from '../utils/logger.js';
 
 // Helpers: string <-> bytea(Buffer)
@@ -45,49 +45,25 @@ function byteaToString(val) {
  */
 export const saveNaverCredentials = async (userStoreId, username, password) => {
   try {
-    logger.info(`네이버 로그인 정보 저장 시작: ${userStoreId}`);
+    // const encryptedUsername = encrypt(username);
+    // const encryptedPassword = encrypt(password);
     
-    // 입력값 검증
-    if (!userStoreId || !username || !password) {
-      throw new Error('userStoreId, username, password가 모두 필요합니다');
-    }
-    
-    // UUID 형식 검증
-    if (!isValidUUID(userStoreId)) {
-      throw new Error('유효하지 않은 userStoreId 형식입니다');
-    }
-    
-    // 로그인 정보 암호화
-    const encryptedUsername = encrypt(username);
-    const encryptedPassword = encrypt(password);
-    
-    // 기존 정보가 있으면 업데이트, 없으면 새로 생성
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('naver_credentials')
       .upsert({
         user_store_id: userStoreId,
-        username_enc: stringToBytea(encryptedUsername),
-        password_enc: stringToBytea(encryptedPassword),
+        username: username, // 일반 텍스트 컬럼 사용
+        password: password, // 일반 텍스트 컬럼 사용
         is_active: true,
         updated_at: new Date().toISOString()
-      }, { 
-        onConflict: 'user_store_id',
-        ignoreDuplicates: false
+      }, {
+        onConflict: 'user_store_id'
       });
-    
-    if (error) {
-      logger.error('네이버 로그인 정보 저장 실패:', error);
-      throw new Error(`데이터베이스 저장 실패: ${error.message}`);
-    }
-    
-    logger.info(`네이버 로그인 정보 저장 완료: ${userStoreId}`);
-    return { 
-      success: true, 
-      message: '네이버 로그인 정보가 안전하게 저장되었습니다' 
-    };
-    
+
+    if (error) throw error;
+    return { success: true, data };
   } catch (error) {
-    logger.error('네이버 로그인 정보 저장 에러:', error);
+    console.error('네이버 자격증명 저장 실패:', error);
     throw error;
   }
 };
@@ -99,58 +75,27 @@ export const saveNaverCredentials = async (userStoreId, username, password) => {
  */
 export const getNaverCredentials = async (userStoreId) => {
   try {
-    logger.info(`네이버 로그인 정보 조회: ${userStoreId}`);
-    
-    if (!userStoreId) {
-      throw new Error('userStoreId가 필요합니다');
-    }
-    
     const { data, error } = await supabase
       .from('naver_credentials')
-      .select('*')
+      .select('username, password')
       .eq('user_store_id', userStoreId)
       .eq('is_active', true)
       .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // 데이터가 없는 경우
-        logger.info(`네이버 로그인 정보가 없습니다: ${userStoreId}`);
-        return null;
-      }
-      throw new Error(`데이터베이스 조회 실패: ${error.message}`);
-    }
-    
-    if (!data) {
-      logger.info(`네이버 로그인 정보가 없습니다: ${userStoreId}`);
-      return null;
-    }
-    
-    // 암호화된 정보 복호화
-    let decryptedUsername = '';
-    let decryptedPassword = '';
-    try { decryptedUsername = decrypt(byteaToString(data.username_enc)); } catch (e) {
-      logger.warn('username 복호화 실패, 원본 사용 시도:', e.message);
-      decryptedUsername = byteaToString(data.username_enc);
-    }
-    try { decryptedPassword = decrypt(byteaToString(data.password_enc)); } catch (e) {
-      logger.warn('password 복호화 실패, 원본 사용 시도:', e.message);
-      decryptedPassword = byteaToString(data.password_enc);
-    }
-    
-    logger.info(`네이버 로그인 정보 조회 완료: ${userStoreId}`);
+
+    if (error) throw error;
+    if (!data) return null;
+
+    // return {
+    //   username: decrypt(data.username),
+    //   password: decrypt(data.password)
+    // };
     
     return {
-      username: decryptedUsername,
-      password: decryptedPassword,
-      lastLoginAt: data.last_login_at,
-      loginFailCount: data.login_fail_count,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
+      username: data.username, // 일반 텍스트 컬럼에서 직접 반환
+      password: data.password  // 일반 텍스트 컬럼에서 직접 반환
     };
-    
   } catch (error) {
-    logger.error('네이버 로그인 정보 조회 에러:', error);
+    console.error('네이버 자격증명 조회 실패:', error);
     throw error;
   }
 };

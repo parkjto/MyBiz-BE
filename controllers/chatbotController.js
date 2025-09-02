@@ -17,17 +17,18 @@ export async function handleTextMessage(req, res) {
       });
     }
     
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: '사용자 ID가 필요합니다.'
-      });
+    // 토큰에서 사용자 식별자 추출 (우선순위: body > token)
+    const tokenUser = req.user || {};
+    const tokenUserId = tokenUser.id || tokenUser.userId || tokenUser.sub;
+    const finalUserId = (userId && String(userId).trim().length > 0) ? userId : tokenUserId;
+    if (!finalUserId) {
+      return res.status(401).json({ success: false, message: '사용자 인증 또는 ID가 필요합니다.' });
     }
     
-    logger.info('텍스트 메시지 처리 요청:', { text, userId });
+    logger.info('텍스트 메시지 처리 요청:', { text, userId: finalUserId });
     
     // 챗봇 서비스로 메시지 처리
-    const response = await processChatMessage(text.trim(), userId);
+    const response = await processChatMessage(text.trim(), finalUserId);
     
     res.json({
       success: true,

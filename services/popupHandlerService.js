@@ -136,4 +136,42 @@ export class PopupHandlerService {
       return checks.every(check => check);
     });
   }
+  
+  // 스마트플레이스 초기 진입 시 잦은 이벤트/배너 팝업을 우선적으로 닫는다
+  static async closeSmartPlaceEntryPopups(page, rounds = 4, waitMs = 350) {
+    for (let i = 0; i < rounds; i++) {
+      try {
+        await page.evaluate(() => {
+          const normalize = (s) => (s || '').replace(/\s+/g, '').trim();
+          const all = Array.from(document.querySelectorAll('*'));
+          // "일주일 동안 보지 않기" 체크
+          const notSee = all.find(el => normalize(el.textContent || '').includes('일주일동안보지않기'))
+            || all.find(el => normalize(el.textContent || '').includes('일주일동안보지않기')); // 중복 안전
+          if (notSee) {
+            const cb = notSee.querySelector('input[type="checkbox"]') || document.querySelector('input[type="checkbox"]');
+            if (cb) (cb).click();
+          }
+          // 닫기 버튼 패턴들
+          const closeSelectors = [
+            'button[aria-label="닫기"]', 'button[title="닫기"]', '[class*="close"]', '[class*="Close"]', '.btn-close',
+            'button[aria-label*="close" i]', 'button:has(svg)', '[role="button"]:has(svg)'
+          ];
+          for (const sel of closeSelectors) {
+            const btns = document.querySelectorAll(sel);
+            if (btns && btns.length) { (btns[0]).dispatchEvent(new MouseEvent('click', { bubbles: true })); break; }
+          }
+          // 고정 오버레이 제거 (광고 배너성)
+          const overlays = Array.from(document.querySelectorAll('div, section, aside'))
+            .filter(el => {
+              const st = window.getComputedStyle(el);
+              return st.position === 'fixed' && (parseInt(st.zIndex || '0', 10) >= 1000 || st.backdropFilter || (st.backgroundColor || '').includes('rgba'));
+            });
+          overlays.forEach(el => { try { el.remove(); } catch(_) {} });
+          document.body.style.overflow = 'auto';
+        });
+      } catch (_) {}
+      try { await this.handleUnexpectedPopups(page, 1); } catch (_) {}
+      await delay(waitMs);
+    }
+  }
 }

@@ -14,20 +14,33 @@ const MODEL_TEXT = process.env.OPENAI_MODEL_TEXT || 'gpt-3.5-turbo';
  */
 function classifyIntent(text) {
   const lowerText = text.toLowerCase();
-  
-  // 매출 관련 명령
-  if (/(매출.*분석|매출.*보여|매출.*확인|매출.*조회|매출.*상황)/.test(lowerText)) {
+
+  // 1) 매출 개선·추천 의도: 화면 이동 금지, 대화로 응답
+  if (
+    /(매출.*올리|매출.*증가|매출.*개선|매출.*방법|매출.*추천|올릴\s*방법|증가\s*방법|개선\s*방법)/.test(lowerText) ||
+    /(방법\s*추천|추천해줘|추천 해줘|방법\s*알려|어떻게\s*해야)/.test(lowerText)
+  ) {
+    return { intent: 'improvement_suggestion', screen: 'chat', priority: 'high' };
+  }
+
+  // 2) 매출 관련 명령 (프론트 의도 분기와 정렬: 매출/매상/알려줘/이번달/지난달/월 매출 등)
+  if (
+    /(매출|매상)/.test(lowerText) &&
+    /(분석|보여|확인|조회|상황|알려줘)/.test(lowerText)
+  ) {
     return { intent: 'sales_analysis', screen: 'sales', priority: 'high' };
   }
-  
-  // 리뷰 관련 명령
-  if (/(리뷰.*분석|리뷰.*보여|리뷰.*확인|리뷰.*조회|리뷰.*상황)/.test(lowerText)) {
-    return { intent: 'review_analysis', screen: 'review', priority: 'high' };
+  // 추가: 구체적인 월 매출 패턴 (ex. "9월 매출", "이번달 매출", "지난달 매출")
+  if (/(\d{1,2})\s*월\s*매출|이번\s*달\s*매출|지난\s*달\s*매출/.test(lowerText)) {
+    return { intent: 'sales_analysis', screen: 'sales', priority: 'high' };
   }
-  
-  // 매출 개선 방안
-  if (/(매출.*올리|매출.*증가|매출.*개선|어떻게.*해야|방법.*알려|조언.*해줘)/.test(lowerText)) {
-    return { intent: 'improvement_suggestion', screen: 'chat', priority: 'medium' };
+
+  // 3) 리뷰 관련 명령 (프론트 의도 분기와 정렬: 리뷰/후기/평점/알려줘/분석)
+  if (
+    /(리뷰|후기|평점)/.test(lowerText) &&
+    /(분석|보여|확인|조회|상황|알려줘)/.test(lowerText)
+  ) {
+    return { intent: 'review_analysis', screen: 'review', priority: 'high' };
   }
   
   // 광고 생성
@@ -267,21 +280,30 @@ async function generateAIAdvice(userId, userQuery) {
     const reviewData = await getReviewData(userId);
     
     const prompt = `
+당신은 한국어로 대화하는 소상공인 비즈니스 코치입니다. 아래의 실제 데이터 요약을 읽고, 사용자 질문에 자연스러운 대화체로 답하세요.
+
 사용자 질문: "${userQuery}"
 
-매출 데이터: ${JSON.stringify(salesData)}
-리뷰 데이터: ${JSON.stringify(reviewData)}
+매출 데이터(요약 JSON): ${JSON.stringify(salesData)}
+리뷰 데이터(요약 JSON): ${JSON.stringify(reviewData)}
 
-위 데이터를 바탕으로 소상공인을 위한 구체적인 매출 개선 방안 3가지를 제시해주세요.
-각 방안은 실행 가능하고 구체적이어야 합니다.
-한국어로 답변해주세요.
+요구사항:
+1) 먼저 1~2문장으로 현재 상황을 아주 간단히 요약합니다. (예: 최근 30일 총매출/일평균, 전주 대비 변화율, 평균 평점 등 핵심 수치만 포함)
+2) 이어서 실행 가능한 개선안 3가지를 제시합니다. 각 항목은 다음 형식을 지킵니다:
+   - 제목: 간결한 액션 명(예: 재방문 쿠폰+오프피크 타임 할인)
+   - 설명: 왜 필요한지(데이터 근거 포함) + 구체적 실행 방법(숫자/조건/기간)
+   - 기대효과: 간단 추정치 또는 기대 변화 방향(정성/정량 중 가능한 범위)
+3) 문장과 톤은 자연스러운 대화체로 작성합니다. 과장 없이, 짧고 명확하게.
+4) 마지막에 한 문장으로 후속질문을 제안합니다. (예: "해당 전략 중 어떤 걸 먼저 시도해볼까요?")
+5) 제공된 JSON 범위 밖의 수치를 임의로 만들지 않습니다. 추정이 필요하면 "~로 예상됩니다"처럼 보수적으로 표현하세요.
+6) 불릿/번호를 사용해 가독성을 높이되, 포맷은 텍스트만 사용합니다.
 `;
 
     const response = await client.chat.completions.create({
       model: MODEL_TEXT,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-      temperature: 0.7
+      max_tokens: 650,
+      temperature: 0.6
     });
     
     return response.choices[0].message.content;

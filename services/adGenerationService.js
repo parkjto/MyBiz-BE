@@ -113,6 +113,63 @@ export async function analyzeImageForAd(imageBuffer) {
 }
 
 /**
+ * 텍스트 기반 광고 목적 자동 추천
+ */
+export async function recommendAdPurposeFromText(userRequestText) {
+  try {
+    const recommendation = await client.chat.completions.create({
+      model: MODEL_TEXT,
+      messages: [
+        {
+          role: 'system',
+          content: `당신은 광고 전략 전문가입니다. 사용자의 요청사항을 분석하여 가장 적합한 광고 목적을 추천해주세요.
+
+          광고 목적 옵션:
+          1. product_launch (신제품 출시) - 새로운 제품/서비스의 혁신성과 가치를 강조
+          2. brand_awareness (브랜드 인지도) - 브랜드의 정체성과 가치를 전달
+          3. promotion_sale (프로모션/할인) - 즉시 행동을 유도하는 매력적인 제안
+          4. lifestyle_branding (라이프스타일 브랜딩) - 특정 라이프스타일과의 연결성 강조
+
+          분석 기준:
+          - 키워드 분석 (출시, 신규, 새로운 → product_launch)
+          - 브랜드 강조 (브랜드, 회사, 업체 → brand_awareness)
+          - 할인/프로모션 (할인, 이벤트, 특가 → promotion_sale)
+          - 라이프스타일 (일상, 생활, 스타일 → lifestyle_branding)
+
+          JSON 형태로 응답하세요:
+          {
+            "recommended_purpose": "추천 광고 목적 키",
+            "confidence": 0.95,
+            "reasoning": "추천 이유 설명",
+            "alternative_purposes": ["대안 목적 1", "대안 목적 2"]
+          }`
+        },
+        {
+          role: 'user',
+          content: `사용자 요청사항: ${userRequestText}`
+        }
+      ],
+      max_tokens: 300,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(recommendation.choices[0].message.content);
+    logger.info('텍스트 기반 광고 목적 추천 완료:', result);
+    return result;
+    
+  } catch (error) {
+    logger.error('텍스트 기반 광고 목적 추천 실패:', error);
+    // 기본값 반환
+    return {
+      recommended_purpose: 'brand_awareness',
+      confidence: 0.7,
+      reasoning: '분석 실패로 인한 기본값 사용',
+      alternative_purposes: ['product_launch', 'lifestyle_branding']
+    };
+  }
+}
+
+/**
  * 2단계: 지능형 텍스트 최적화 (GPT 기반)
  */
 export async function optimizeTextForAd(userInputs, imageAnalysis, adPurpose) {
@@ -196,7 +253,7 @@ export async function generateAdDesign(purpose, optimizedText, imageAnalysis, or
     const posterBase64 = posterBuffer.toString('base64');
     const posterUrl = `data:image/png;base64,${posterBase64}`;
     
-    logger.info('Sharp.js 텍스트 오버레이 포스터 생성 완료');
+    logger.info('Sharp.js 텍스트 오버레이 포스터 생성 완료:', { posterUrlLength: posterUrl.length });
     
     return {
       poster_url: posterUrl,
@@ -418,9 +475,9 @@ IMPORTANT: The poster MUST be based on the user's uploaded image (${imageAnalysi
 /**
  * 통합 광고 생성 (3단계 전체 프로세스)
  */
-export async function generateCompleteAd(imageBuffer, userInputs, adPurpose) {
+export async function generateCompleteAd(imageBuffer, userInputs, adPurpose, userRequestText = '') {
   try {
-    logger.info('AI 기반 광고 생성 시작:', { adPurpose, userInputs });
+    logger.info('AI 기반 광고 생성 시작:', { adPurpose, userInputs, userRequestText });
     
     // 🚫 사용자 입력 절대 검증 (AI 임의 생성 금지)
     if (!userInputs.brand_name || !userInputs.brand_name.trim()) {
@@ -438,11 +495,26 @@ export async function generateCompleteAd(imageBuffer, userInputs, adPurpose) {
       contact_info: userInputs.contact_info || '없음'
     });
     
+    // 광고 목적 자동 추천 (사용자가 지정하지 않은 경우)
+    let finalAdPurpose = adPurpose;
+    let purposeRecommendation = null;
+    
+    if (!adPurpose || adPurpose === 'auto') {
+      logger.info('광고 목적 자동 추천 시작');
+      purposeRecommendation = await recommendAdPurposeFromText(userRequestText);
+      finalAdPurpose = purposeRecommendation.recommended_purpose;
+      logger.info('자동 추천된 광고 목적:', { 
+        purpose: finalAdPurpose, 
+        confidence: purposeRecommendation.confidence,
+        reasoning: purposeRecommendation.reasoning 
+      });
+    }
+    
     // 1단계: 이미지 분석 (업로드된 사진만 사용)
     const imageAnalysis = await analyzeImageForAd(imageBuffer);
     
     // 2단계: 텍스트 최적화 (사용자 입력 100% 보존)
-    const optimizedText = await optimizeTextForAd(userInputs, imageAnalysis, adPurpose);
+    const optimizedText = await optimizeTextForAd(userInputs, imageAnalysis, finalAdPurpose);
     
     // 🚫 브랜드명과 상품은 절대 보존 (AI 변경 금지)
     optimizedText.optimized_brand = userInputs.brand_name;
@@ -457,22 +529,23 @@ export async function generateCompleteAd(imageBuffer, userInputs, adPurpose) {
     }
     
     // 3단계: DALL-E 3가 직접 포스터 이미지 생성 (원본 사진 + 텍스트 합성)
-    const purpose = getAdPurposePresets().find(p => p.key === adPurpose);
+    const purpose = getAdPurposePresets().find(p => p.key === finalAdPurpose);
     
     // purpose가 없을 경우 기본값 제공
     if (!purpose) {
-      logger.warn(`광고 목적 '${adPurpose}'에 대한 프리셋을 찾을 수 없음. 기본값 사용.`);
+      logger.warn(`광고 목적 '${finalAdPurpose}'에 대한 프리셋을 찾을 수 없음. 기본값 사용.`);
       // 기본 프리셋 사용
       const defaultPurpose = getAdPurposePresets()[0]; // 첫 번째 프리셋을 기본값으로
       const adDesign = await generateAdDesign(defaultPurpose, optimizedText, imageAnalysis, imageBuffer);
       
       // 최종 결과 통합
       const result = {
-        ad_purpose: adPurpose,
+        ad_purpose: finalAdPurpose,
         image_analysis: imageAnalysis,
         optimized_text: optimizedText,
         design: adDesign,
         poster_url: adDesign.poster_url, // DALL-E 3가 생성한 포스터 이미지 URL
+        purpose_recommendation: purposeRecommendation, // 자동 추천 정보 (있는 경우)
         metadata: {
           generated_at: new Date().toISOString(),
           model_versions: {
@@ -484,7 +557,7 @@ export async function generateCompleteAd(imageBuffer, userInputs, adPurpose) {
         }
       };
       
-      logger.info('DALL-E 3 기반 광고 생성 완료 (기본 프리셋):', { adPurpose, success: true });
+      logger.info('DALL-E 3 기반 광고 생성 완료 (기본 프리셋):', { finalAdPurpose, success: true });
       return result;
     }
     
@@ -493,13 +566,14 @@ export async function generateCompleteAd(imageBuffer, userInputs, adPurpose) {
     // OpenAI images/generations API가 생성한 포스터 이미지를 직접 사용 (추가 합성 불필요)
     logger.info('OpenAI images/generations API 포스터 이미지 사용:', { posterUrl: adDesign.poster_url?.substring(0, 100) + '...' });
     
-    // 최종 결과 통합
+    // 최종 결과 통합 (자동 추천 정보 포함)
     const result = {
-      ad_purpose: adPurpose,
+      ad_purpose: finalAdPurpose,
       image_analysis: imageAnalysis,
       optimized_text: optimizedText,
       design: adDesign,
       poster_url: adDesign.poster_url, // OpenAI images/generations API가 생성한 포스터 이미지 URL
+      purpose_recommendation: purposeRecommendation, // 자동 추천 정보 (있는 경우)
       metadata: {
         generated_at: new Date().toISOString(),
         model_versions: {
@@ -511,7 +585,7 @@ export async function generateCompleteAd(imageBuffer, userInputs, adPurpose) {
       }
     };
     
-    logger.info('AI 기반 광고 생성 완료:', { adPurpose, success: true });
+    logger.info('AI 기반 광고 생성 완료:', { finalAdPurpose, success: true });
     return result;
     
   } catch (error) {
