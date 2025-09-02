@@ -11,17 +11,17 @@ import {
 const router = express.Router();
 
 /**
- * 🚀 네이버 연동 API 엔드포인트
+ * 🚀 네이버 플레이스 연동 API 엔드포인트
  * 
  * 모든 엔드포인트는 인증이 필요하며, 속도 제한이 적용됩니다.
  */
 
-// 네이버 연동 설정 (로그인 정보 저장)
+// 네이버 플레이스 연동 설정 (로그인 정보 저장)
 /**
  * @openapi
  * /api/naver-credentials/setup:
  *   post:
- *     summary: 네이버 연동 설정(로그인 정보 저장)
+ *     summary: 네이버 플레이스 연동 설정(로그인 정보 저장)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -57,12 +57,12 @@ router.post('/setup', protect, strictRateLimiter, setupNaverIntegration);
  */
 router.post('/test/:userStoreId', protect, strictRateLimiter, testNaverConnection);
 
-// 네이버 연동 상태 조회
+// 네이버 플레이스 연동 상태 조회
 /**
  * @openapi
  * /api/naver-credentials/status/{userStoreId}:
  *   get:
- *     summary: 네이버 연동 상태 조회
+ *     summary: 네이버 플레이스 연동 상태 조회
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -77,12 +77,12 @@ router.post('/test/:userStoreId', protect, strictRateLimiter, testNaverConnectio
  */
 router.get('/status/:userStoreId', protect, strictRateLimiter, getNaverIntegrationStatus);
 
-// 네이버 연동 해제 (로그인 정보 삭제)
+// 네이버 플레이스 연동 해제 (로그인 정보 삭제)
 /**
  * @openapi
  * /api/naver-credentials/{userStoreId}:
  *   delete:
- *     summary: 네이버 연동 해제
+ *     summary: 네이버 플레이스 연동 해제
  *     security:
  *       - bearerAuth: []
  *     parameters:

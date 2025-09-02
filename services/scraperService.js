@@ -366,19 +366,20 @@ export const scrapeReviewsWithSession = async (userStoreId) => {
     
     // 리뷰 저장
     console.log('💾 리뷰 저장 중...');
-    await saveReviews(userStoreId, reviews);
+    const savedReviews = await saveReviews(userStoreId, reviews);
     
     console.log('🎉 스크래핑 완료!');
     return { 
       reviewCount: reviews.length, 
-      newReviews: reviews, 
+      newReviews: reviews,
+      savedReviews: savedReviews,
       scrapedAt: new Date(),
       placeInfo
     };
     
   } finally {
     await browser.close();
-    console.log('�� 브라우저 종료');
+    console.log('🔒 브라우저 종료');
   }
 };
 

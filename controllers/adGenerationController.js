@@ -212,7 +212,8 @@ export const generateCompleteAd = async (req, res, next) => {
     const completeAd = await generateCompleteAdService(
       req.file.buffer,
       user_inputs,
-      ad_purpose
+      ad_purpose,
+      req.body.user_request_text || '' // 사용자 요청사항 텍스트 전달
     );
     
     return res.json({

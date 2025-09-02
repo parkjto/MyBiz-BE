@@ -3,6 +3,36 @@ import delay from 'delay';
 import { getNaverCredentials } from './naverCredentialService.js';
 import { saveNaverSession } from './sessionService.js';
 import { logger } from '../utils/logger.js';
+import { supabase } from './supabaseService.js';
+
+// 간단한 클릭 시도 유틸
+async function tryClick(page, selectors = []) {
+  for (const selector of selectors) {
+    try {
+      const el = await page.$(selector);
+      if (el) {
+        await el.click();
+        return true;
+      }
+    } catch (e) {
+      // ignore and continue
+    }
+  }
+  return false;
+}
+
+// 텍스트로 요소 찾기(XPath)
+async function findByText(page, tag, texts = []) {
+  for (const text of texts) {
+    try {
+      const [el] = await page.$x(`//${tag}[contains(., '${text}')]`);
+      if (el) return el;
+    } catch (e) {
+      // ignore
+    }
+  }
+  return null;
+}
 
 /**
  * 네이버 자동 로그인 실행
@@ -89,6 +119,10 @@ export const autoLoginToNaver = async (userStoreId, overrideCredentials) => {
       '.btn-submit'
     ];
     
+    // 사용자명 입력 전, QR/다른 로그인 화면일 경우 ID/PW 폼으로 전환 시도
+    await tryClick(page, ['#goOtherLogin', 'a#goOtherLogin', 'button#goOtherLogin']);
+    await delay(500);
+    
     // 사용자명 입력
     let usernameInput = null;
     for (const selector of usernameSelectors) {
@@ -103,6 +137,27 @@ export const autoLoginToNaver = async (userStoreId, overrideCredentials) => {
       }
     }
     
+    // 그래도 없으면 공식 로그인 페이지로 이동 후 재시도
+    if (!usernameInput) {
+      logger.warn('사용자명 입력 필드 미발견, 네이버 계정 로그인 페이지로 이동합니다.');
+      const redirectUrl = encodeURIComponent('https://new.smartplace.naver.com/');
+      await page.goto(`https://nid.naver.com/nidlogin.login?mode=form&url=${redirectUrl}` , {
+        waitUntil: 'networkidle0',
+        timeout: 30000
+      });
+      await delay(1000);
+      await tryClick(page, ['#goOtherLogin', 'a#goOtherLogin', 'button#goOtherLogin']);
+      for (const selector of usernameSelectors) {
+        try {
+          usernameInput = await page.$(selector);
+          if (usernameInput) {
+            logger.info(`사용자명 입력 필드 발견(redirect): ${selector}`);
+            break;
+          }
+        } catch {}
+      }
+    }
+
     if (!usernameInput) {
       throw new Error('사용자명 입력 필드를 찾을 수 없습니다');
     }
@@ -137,6 +192,10 @@ export const autoLoginToNaver = async (userStoreId, overrideCredentials) => {
       } catch (e) {
         // 선택자 오류 무시하고 다음 시도
       }
+    }
+    if (!loginButton) {
+      loginButton = await findByText(page, 'button', ['로그인', 'Login']);
+      if (loginButton) logger.info('로그인 버튼 발견(text 검색)');
     }
     
     if (!loginButton) {
@@ -287,7 +346,7 @@ const recordLoginFailure = async (userStoreId, errorMessage) => {
       .from('naver_login_history')
       .insert({
         user_store_id: userStoreId,
-        login_status: 'failed',
+        success: false,
         error_message: errorMessage
       });
     
@@ -324,7 +383,7 @@ const updateLoginSuccess = async (userStoreId) => {
       .from('naver_login_history')
       .insert({
         user_store_id: userStoreId,
-        login_status: 'success'
+        success: true
       });
     
   } catch (error) {

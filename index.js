@@ -115,7 +115,7 @@ app.get('/health', (req, res) => {
 // Error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT;
 const server = app.listen(PORT, () => {
   logger.info(`[서버] http://localhost:${PORT} 에서 실행 중`);
   logger.info(`[API] 텍스트 기반 광고: POST /api/ad/generate`);
@@ -132,7 +132,7 @@ const server = app.listen(PORT, () => {
   logger.info(`[API] 리뷰 분석: /api/reviews/analysis`);
   logger.info(`[API] 매장 관리: /api/stores`);
   logger.info(`[API] 네이버 로컬: /api/naver`);
-  logger.info(`[API] 네이버 연동: /api/naver-credentials`);
+  logger.info(`[API] 네이버 플레이스 연동: /api/naver-credentials`);
   logger.info(`[API] 매출 관리: /api/sales`);
   logger.info(`[API] API 문서: /api-docs`);
   logger.info(`[API] 챗봇: /api/chatbot`);

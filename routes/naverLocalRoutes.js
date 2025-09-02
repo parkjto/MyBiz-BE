@@ -3,6 +3,7 @@ import { protect } from '../middlewares/authMiddleware.js';
 import { rateLimiter } from '../middlewares/rateLimiter.js';
 import {
   searchStores,
+  searchStoresPublic,
   findStoreWithPlaceId,
   findStoreByCoordinates,
   extractPlaceId,
@@ -43,6 +44,36 @@ router.get('/status', getApiStatus);
  *         description: 검색 결과
  */
 router.post('/search', protect, rateLimiter, searchStores);
+
+// 회원가입용 매장 검색 (인증 불필요)
+/**
+ * @openapi
+ * /api/naver/search-public:
+ *   post:
+ *     summary: 회원가입용 매장 검색 (인증 불필요)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: 검색할 매장명
+ *               limit:
+ *                 type: number
+ *                 description: 검색 결과 제한 수
+ *               for_signup:
+ *                 type: boolean
+ *                 description: 회원가입용 검색 여부
+ *     responses:
+ *       200:
+ *         description: 검색 결과 (회원가입용)
+ *       400:
+ *         description: 잘못된 요청
+ */
+router.post('/search-public', rateLimiter, searchStoresPublic);
 
 // 매장 검색 및 Place ID 추출 (인증 필요)
 /**

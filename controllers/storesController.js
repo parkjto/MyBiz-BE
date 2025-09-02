@@ -78,13 +78,24 @@ export const getStore = async (req, res, next) => {
 export const createStore = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { store_name, address, road_address, phone, category, coordinates_x, coordinates_y, place_id, map_url } = req.body;
+    const { store_name, address, road_address, phone, category, coordinates_x, coordinates_y, place_id, map_url, is_primary } = req.body;
 
     if (!store_name || !address) {
       return res.status(400).json({ 
         success: false, 
         message: '스토어명과 주소는 필수입니다' 
       });
+    }
+
+    const desiredPrimary = (typeof is_primary === 'boolean') ? is_primary : true;
+
+    // 다른 primary 비활성화 (요청이 primary인 경우)
+    if (desiredPrimary) {
+      const { error: unsetErr } = await supabase
+        .from('user_stores')
+        .update({ is_primary: false })
+        .eq('user_id', userId);
+      if (unsetErr) throw unsetErr;
     }
 
     const payload = { 
@@ -98,6 +109,7 @@ export const createStore = async (req, res, next) => {
       coordinates_y,
       place_id,
       map_url,
+      is_primary: desiredPrimary,
       extracted_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -111,7 +123,7 @@ export const createStore = async (req, res, next) => {
 
     if (error) throw error;
     
-    logger.info(`새 스토어 생성: ${data.id} (${data.store_name})`);
+    logger.info(`새 스토어 생성: ${data.id} (${data.store_name}), is_primary: ${data.is_primary}`);
     res.status(201).json({ success: true, data });
   } catch(e){ 
     logger.error('스토어 생성 에러:', e);

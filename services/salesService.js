@@ -19,9 +19,48 @@ function toInteger(value, fallback = 0) {
 }
 
 function normalizeDate(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  if (value == null) return null;
+
+  // 숫자(엑셀 일련값) 처리: 1899-12-30 기준
+  if (typeof value === 'number' || /^\d+(?:\.\d+)?$/.test(String(value).trim())) {
+    const num = Number(String(value).trim());
+    if (Number.isFinite(num) && num > 0) {
+      // 정수부=일수, 소수부=시분초
+      const base = new Date(Date.UTC(1899, 11, 30, 0, 0, 0));
+      const millis = Math.floor(num) * 24 * 60 * 60 * 1000 + Math.round((num % 1) * 24 * 60 * 60 * 1000);
+      const dt = new Date(base.getTime() + millis);
+      if (!Number.isNaN(dt.getTime())) return dt.toISOString();
+    }
+  }
+
+  let s = String(value);
+  // BOM/제로폭/비가시문자 제거
+  s = s.replace(/\ufeff|\u200B|\u200C|\u200D|\u2060/g, '');
+  s = s.trim();
+  if (!s) return null;
+
+  // 다양한 하이픈/마이너스 문자 통일
+  s = s.replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
+  // 구분자 통일
+  s = s.replace(/[.]/g, '-').replace(/\//g, '-').replace(/\s+/g, ' ');
+
+  // 1) ISO 유사 포맷 먼저 시도
+  const d1 = new Date(s);
+  if (!Number.isNaN(d1.getTime())) return d1.toISOString();
+
+  // 2) YYYY-MM-DD [HH:mm[:ss]]
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const da = Number(m[3]);
+    const hh = Number(m[4] || '0');
+    const mm = Number(m[5] || '0');
+    const ss = Number(m[6] || '0');
+    const dt = new Date(Date.UTC(y, mo - 1, da, hh, mm, ss));
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+  return null;
 }
 
 function validateDateRange(start, end) {
@@ -48,13 +87,13 @@ function validateDateRange(start, end) {
   }
 }
 
-function mapCsvRowToSale(row, userId) {
-  const dateRaw = row.sale_date || row.date || row.transaction_date || row.created_at;
-  const productName = row.product_name || row.product || row.menu || row.item_name;
-  const category = row.category || row.type || row.group || null;
-  const quantity = toInteger(row.quantity || row.qty || 1, 1);
-  const unitPrice = toInteger(row.unit_price || row.price || 0, 0);
-  const totalAmount = toInteger(row.total_amount || row.amount || unitPrice * quantity, 0);
+function mapCsvRowToSale(row, userStoreId) {
+  const dateRaw = row.order_datetime || row.sale_date || row.date || row.transaction_date || row.created_at || row['일시'] || row['판매일'] || row['주문일시'] || row['일자'];
+  const productName = row.product_name || row.product || row.menu || row.item_name || row['상품명'] || row['메뉴'] || row['품목'];
+  const category = row.category || row.type || row.group || row['카테고리'] || row['분류'] || null;
+  const quantity = toInteger(row.quantity || row.qty || row['수량'] || 1, 1);
+  const unitPrice = toInteger(row.unit_price || row.price || row['단가'] || 0, 0);
+  const totalAmount = toInteger(row.total_amount || row.amount || row['금액'] || row['총액'] || (unitPrice * quantity), 0);
 
   return {
     order_datetime: normalizeDate(dateRaw),
@@ -63,66 +102,88 @@ function mapCsvRowToSale(row, userId) {
     quantity,
     unit_price: unitPrice,
     total_amount: totalAmount,
-    user_store_id: userId || null,
-    payment_method: 'cash' // 기본값 설정
+    user_store_id: userStoreId || null,
+    payment_method: 'cash'
   };
+}
+
+async function ensurePrimaryStoreForUser(userId) {
+  if (!userId) return null;
+  const { data: existing, error: storeError } = await supabase
+    .from('user_stores')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_primary', true)
+    .single();
+  if (!storeError && existing?.id) {
+    return existing.id;
+  }
+  // 기본 매장이 없으면 생성
+  const { data: created, error: insertErr } = await supabase
+    .from('user_stores')
+    .insert({
+      user_id: userId,
+      store_name: '기본 매장',
+      is_primary: true
+    })
+    .select('id')
+    .single();
+  if (insertErr) {
+    const err = new Error(`기본 매장 생성 실패: ${insertErr.message}`);
+    err.statusCode = 400;
+    throw err;
+  }
+  return created?.id || null;
 }
 
 export async function parseAndInsertCsv(filePath, userId) {
   ensureSupabase();
 
-  // 사용자의 기본 스토어 ID 조회
-  let userStoreId = null;
-  if (userId) {
-    console.log('사용자 ID로 스토어 조회:', userId);
-    const { data: stores, error: storeError } = await supabase
-      .from('user_stores')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('is_primary', true)
-      .single();
-    
-    console.log('스토어 조회 결과:', { stores, storeError });
-    
-    if (!storeError && stores) {
-      userStoreId = stores.id;
-      console.log('사용자 스토어 ID:', userStoreId);
-    } else {
-      console.log('스토어 조회 실패:', storeError);
-    }
-  }
+  const userStoreId = await ensurePrimaryStoreForUser(userId);
 
   const start = Date.now();
   let processedCount = 0;
   let insertedCount = 0;
+  let invalidDateCount = 0;
+  const invalidSamples = [];
   const batch = [];
+  let headerLogged = false;
 
   try {
     await csv()
       .fromFile(filePath)
       .subscribe(async (json) => {
+        if (!headerLogged) {
+          try { logger.info('CSV 헤더 확인', { keys: Object.keys(json) }); } catch (_) {}
+          headerLogged = true;
+        }
+        const rawDate = json.order_datetime ?? json['order_datetime'] ?? json['일시'] ?? json['판매일'] ?? json['주문일시'] ?? json['일자'] ?? json['date'] ?? json['sale_date'] ?? json['transaction_date'] ?? json['created_at'];
         const mapped = mapCsvRowToSale(json, userStoreId);
-        if (!mapped.order_datetime) return; // 유효하지 않은 날짜는 스킵
+        if (!mapped.order_datetime) {
+          invalidDateCount += 1;
+          if (invalidSamples.length < 5) invalidSamples.push(String(rawDate));
+          return; // skip
+        }
         batch.push(mapped);
         processedCount += 1;
         
         if (batch.length >= BATCH_SIZE) {
           const toInsert = batch.splice(0, batch.length);
-          const { error, count } = await supabase.from('sales').insert(toInsert, { returning: 'minimal', count: 'exact' });
+          const { error } = await supabase.from('sales').insert(toInsert);
           if (error) throw error;
-          insertedCount += count || toInsert.length;
+          insertedCount += toInsert.length;
         }
       });
 
     if (batch.length > 0) {
       const toInsert = batch.splice(0, batch.length);
-      const { error, count } = await supabase.from('sales').insert(toInsert, { returning: 'minimal', count: 'exact' });
+      const { error } = await supabase.from('sales').insert(toInsert);
       if (error) throw error;
-      insertedCount += count || toInsert.length;
+      insertedCount += toInsert.length;
     }
 
     const durationMs = Date.now() - start;
-    return { processedCount, insertedCount, durationMs };
+    return { processedCount, insertedCount, invalidDateCount, invalidSamples, durationMs, userStoreId };
   } catch (error) {
     logger.error('CSV 파싱/저장 실패', { message: error.message });
     const err = new Error(`CSV 처리 실패: ${error.message}`);

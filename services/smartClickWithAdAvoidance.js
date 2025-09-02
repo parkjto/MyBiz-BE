@@ -52,19 +52,24 @@ export class SmartClickWithAdAvoidance {
         return null;
       },
       
-      // 전략 3: 텍스트 내용으로 찾기
+      // 전략 3: 텍스트 내용으로 찾기 (evaluateHandle 사용, 실제 ElementHandle 반환)
       async () => {
         if (targetInfo.text) {
-          return await page.evaluate((text) => {
-            const allElements = document.querySelectorAll('a, button, div, span');
-            for (const el of allElements) {
-              if (el.textContent?.trim().includes(text) && 
-                  el.offsetParent !== null) {
+          const handle = await page.evaluateHandle((text) => {
+            const normalize = (s) => (s || '').replace(/\s+/g, '').trim();
+            const target = normalize(text);
+            const nodes = document.querySelectorAll('a, button, div, span');
+            for (const el of nodes) {
+              const txt = normalize(el.textContent || '');
+              if (txt.includes(target) && (el).offsetParent !== null) {
                 return el;
               }
             }
             return null;
           }, targetInfo.text);
+          const element = handle.asElement ? handle.asElement() : null;
+          if (element) return element;
+          try { await handle.dispose(); } catch (_) {}
         }
         return null;
       },

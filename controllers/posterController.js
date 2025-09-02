@@ -175,11 +175,30 @@ export const generateSingleComposite = async (req, res, next) => {
       .sharpen()
       .toBuffer();
 
-    // 메타 및 캔버스 크기
-    const img = sharp(baseBuffer, { failOn: 'none' });
-    const meta = await img.metadata();
-    const width = meta.width || 1024;
-    const height = meta.height || 1024;
+    // 메타 및 캔버스 크기 (세로 1:1.5 고정 = 1024x1536)
+    const src = sharp(baseBuffer, { failOn: 'none' });
+    const meta = await src.metadata();
+    const srcW = meta.width || 1024;
+    const srcH = meta.height || 1024;
+    const width = 1024;
+    const height = 1536;
+
+    // 배경: 원본을 cover로 깔고 블러/살짝 보정
+    const bgBuffer = await sharp(baseBuffer, { failOn: 'none' })
+      .resize(width, height, { fit: 'cover' })
+      .blur(20)
+      .modulate({ brightness: 1.02, saturation: 1.02 })
+      .toBuffer();
+
+    // 전경: 원본을 contain으로 맞춰 전체가 보이게 중앙 배치
+    const scale = Math.min(width / srcW, height / srcH);
+    const fgW = Math.max(1, Math.round(srcW * scale));
+    const fgH = Math.max(1, Math.round(srcH * scale));
+    const offsetX = Math.floor((width - fgW) / 2);
+    const offsetY = Math.floor((height - fgH) / 2);
+    const fgBuffer = await sharp(baseBuffer, { failOn: 'none' })
+      .resize(fgW, fgH, { fit: 'contain' })
+      .toBuffer();
 
     // 레이아웃 산출
     const layout = buildTextLayout(style, user);
@@ -225,13 +244,16 @@ export const generateSingleComposite = async (req, res, next) => {
         <rect y="${height - gradHeight}" width="100%" height="${gradHeight}" fill="url(#gradBottom)"/>
         ${svgText(layout.title)}
         ${svgText(layout.subtitle)}
-        ${svgText(layout.footer)}
+        ${svgText(layout.meta1)}
       </svg>`
     );
 
-    // 합성
-    const after = await img
-      .composite([{ input: svg, top: 0, left: 0 }])
+    // 합성: 배경 + 전경(원본) + 텍스트
+    const after = await sharp(bgBuffer, { failOn: 'none' })
+      .composite([
+        { input: fgBuffer, top: offsetY, left: offsetX },
+        { input: svg, top: 0, left: 0 }
+      ])
       .toFormat('webp', { quality: 90 })
       .toBuffer();
 
